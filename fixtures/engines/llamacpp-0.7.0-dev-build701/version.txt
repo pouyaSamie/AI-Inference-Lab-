@@ -1,0 +1,4 @@
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 11908 MiB):
+  Device 0: NVIDIA GeForce RTX 3060, compute capability 8.6, VMM: yes, VRAM: 11908 MiB
+version: 0.7.0-dev (build 701, commit dd002b91f)
+built with GNU 15.2.0 for Linux x86_64

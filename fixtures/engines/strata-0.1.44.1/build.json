@@ -1,0 +1,15 @@
+{
+  "source": "local",
+  "version": "0.1.44.1",
+  "archs": [
+    86
+  ],
+  "vision": "none",
+  "cuda_dirs": [
+    "/usr/local/cuda-13.1/bin",
+    "/usr/local/cuda-13.1/lib64"
+  ],
+  "src": "7dfd34378bd2d32a",
+  "commit": "296b59d2f73c8f04a805df29c2fa97655adace78",
+  "binary_sha256": "fa29349e3eaab141aceab98a91dc999b450a7f6b9c28f323cafc7ec865a2a98d"
+}

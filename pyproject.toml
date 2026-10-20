@@ -1,0 +1,91 @@
+[project]
+name = "inference-optimization-lab"
+version = "0.1.0"
+description = "Local-first AI inference optimization laboratory (Phase 0/1 foundation)"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "lab-core",
+  "lab-bench",
+  "lab-adapters",
+  "lab-api",
+  "lab-optimizer",
+  "lab-worker",
+]
+
+[dependency-groups]
+dev = [
+  "alembic>=1.13,<2",
+  "httpx>=0.27,<1",
+  "mypy>=1.11,<2",
+  "pytest>=8.2,<9",
+  "pytest-asyncio>=0.23,<1",
+  "pytest-timeout>=2.3,<3",
+  "ruff>=0.6,<1",
+  "types-psutil",
+]
+
+[tool.uv.workspace]
+members = [
+  "python/lab_core",
+  "python/lab_bench",
+  "python/lab_adapters",
+  "python/lab_api",
+  "python/lab_optimizer",
+  "python/lab_worker",
+]
+
+[tool.uv.sources]
+lab-core = { workspace = true }
+lab-bench = { workspace = true }
+lab-adapters = { workspace = true }
+lab-api = { workspace = true }
+lab-optimizer = { workspace = true }
+lab-worker = { workspace = true }
+
+[tool.ruff]
+target-version = "py312"
+line-length = 110
+src = ["python"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "S", "SIM", "RUF"]
+ignore = [
+  "S101",  # asserts are used in tests
+  "S603",  # subprocess is used only by the worker runner (Phase 2)
+  "S607",
+  "B008",
+  "RUF012",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S108", "S311"]
+"python/lab_worker/**" = ["S603", "S607"]
+"scripts/**" = ["S603", "S607"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+exclude = ["migrations", "build"]
+mypy_path = "python"
+
+[[tool.mypy.overrides]]
+module = ["optuna.*", "alembic.*", "psutil.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers --strict-config"
+timeout = 120
+markers = [
+  "resilience: crash and recovery simulations",
+  "integration: controller/optimizer/worker integration",
+  "contract: generated API contract checks",
+]
+filterwarnings = [
+  "ignore::DeprecationWarning:alembic.*",
+]
