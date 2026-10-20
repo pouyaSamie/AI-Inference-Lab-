@@ -123,7 +123,7 @@ Observed:
 - `ruff check`: all checks passed.
 - `ruff format --check`: 93 files already formatted.
 - `mypy python`: success, no issues in 79 source files.
-- `pytest -q`: **18 passed in 5.05s (final run)**.
+- `pytest -q`: **18 passed in 4.85s (final verification run)**.
 - contract check: **contracts are current**.
 - `pnpm typecheck`: passed.
 

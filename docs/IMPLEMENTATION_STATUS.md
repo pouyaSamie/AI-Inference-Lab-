@@ -58,7 +58,7 @@ uv run mypy python
 # Success: no issues found in 79 source files
 
 uv run pytest -q
-# 18 passed in 5.05s (final run)
+# 18 passed in 4.85s (final verification run)
 
 uv run python scripts/check_contracts.py
 # contracts are current
