@@ -1,0 +1,8 @@
+{
+  "n_ctx": 32768,
+  "default_generation_settings": {
+    "n_ctx": 32768
+  },
+  "model_path": "/models/Tiny-Q4_K_M.gguf",
+  "chat_template": "fixture"
+}

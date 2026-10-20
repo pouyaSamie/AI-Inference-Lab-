@@ -1,7 +1,8 @@
 # AI Inference Optimization Lab
 
-Phase 2 foundation for a local-first inference optimization controller,
-supervised Optuna process, and durable Linux worker protocol.
+Phase 3 foundation for a local-first inference optimization controller,
+supervised Optuna process, durable Linux worker protocol and conformance-tested
+llama.cpp/Strata adapters.
 
 > **The execution lanes are separate.** `lab-worker-sim` produces deterministic
 > simulated observations marked `simulated=true`; those can never qualify a
@@ -83,6 +84,14 @@ pnpm typecheck
 The tests start a live loopback controller, simulated worker and optimizer using
 temporary SQLite databases. They do not require GPU access or live engines. Real
 worker unit tests use a synthetic GGUF file and the trusted Python interpreter.
+Adapter conformance tests parse committed installed-build help/version and
+evidence fixtures; they verify that emitted flags are observed, candidate types
+are strict, Strata profiles do not duplicate managed flags and generated-file
+digests match.
+
+The installed Strata `0.1.44.1` build exposes no `models list`, `doctor`,
+`engine calibrate` or `bench run` command. Those forms are refused rather than
+synthesized; full-context proof remains `INCONCLUSIVE` until Phase 4.
 
 ## Repository map
 

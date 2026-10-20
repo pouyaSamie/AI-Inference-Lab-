@@ -72,6 +72,7 @@ from ..base.parsing import (
     probe_command,
     require_flags,
     server_readiness,
+    validate_capability_value,
 )
 from ..base.protocol import InferenceAdapter
 from ..base.results import ValidatedEvidence
@@ -88,6 +89,15 @@ def _int(parameters: Mapping[str, object], key: str, default: int) -> int:
     return value
 
 
+def _float(parameters: Mapping[str, object], key: str, default: float) -> float:
+    value = parameters.get(key)
+    if value is None:
+        return default
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"parameter {key!r} must be a number")
+    return float(value)
+
+
 def _bool(parameters: Mapping[str, object], key: str, default: bool) -> bool:
     value = parameters.get(key)
     if value is None:
@@ -95,6 +105,79 @@ def _bool(parameters: Mapping[str, object], key: str, default: bool) -> bool:
     if not isinstance(value, bool):
         raise ValueError(f"parameter {key!r} must be a boolean")
     return value
+
+
+def _gpu_value(value: object) -> int | list[int]:
+    if value is None:
+        return 0
+    if isinstance(value, bool):
+        raise ValueError("gpu must be an index or comma-separated indices")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        parts = [part.strip() for part in value.split(",") if part.strip()]
+        if not parts or not all(part.isdigit() for part in parts):
+            raise ValueError("gpu must be an index or comma-separated indices")
+        indices = [int(part) for part in parts]
+        return indices[0] if len(indices) == 1 else indices
+    if isinstance(value, list) and all(
+        isinstance(item, int) and not isinstance(item, bool) for item in value
+    ):
+        return value
+    raise ValueError("gpu must be an index or comma-separated indices")
+
+
+_PROFILE_VALUE_FLAGS = frozenset(
+    {
+        "--pack",
+        "--max-context",
+        "--kv",
+        "--expert-cache",
+        "--prefill",
+        "--spec",
+        "--spec-min-p",
+        "--pool-workers",
+        "--kv-resident",
+        "--batch",
+        "--slots",
+        "--ple-io",
+        "--gpu",
+        "--native",
+        "--ple-gguf",
+        "--mtp",
+        "--expert-profile",
+        "--max-new",
+    }
+)
+_PROFILE_BOOL_FLAGS = frozenset({"--kv-grow", "--resident-experts", "--mmap-experts", "--serve"})
+
+
+def _strip_managed_args(args: list[str]) -> list[str]:
+    """Drop operator base args that this adapter re-emits from typed inputs.
+
+    Keeping them would create duplicate flags; removing only values whose flag
+    starts with ``-`` avoids guessing at the operator's profile conventions.
+    """
+
+    cleaned: list[str] = []
+    index = 0
+    while index < len(args):
+        item = args[index]
+        key = item.split("=", 1)[0]
+        if key in _PROFILE_BOOL_FLAGS:
+            index += 1
+            continue
+        if key in _PROFILE_VALUE_FLAGS:
+            if "=" in item:
+                index += 1
+                continue
+            index += 1
+            if index < len(args) and not args[index].startswith("-"):
+                index += 1
+            continue
+        cleaned.append(item)
+        index += 1
+    return cleaned
 
 
 class StrataAdapter(InferenceAdapter):
@@ -151,12 +234,27 @@ class StrataAdapter(InferenceAdapter):
                     "provenance": CapabilityProvenance.OBSERVED_CLI,
                 },
             ),
-            "--expert-cache": (CapabilityKind.STRING, {"default": "auto"}),
-            "--prefill": (CapabilityKind.STRING, {"default": "auto"}),
+            "--expert-cache": (CapabilityKind.INT, {"minimum": 0, "maximum": 4096, "default": 0}),
+            "--prefill": (
+                CapabilityKind.STRING,
+                {
+                    "default": "auto",
+                    "constraints": (
+                        "Observed values are auto, auto:16384, auto:32768 or a positive chunk size.",
+                    ),
+                },
+            ),
             "--spec": (CapabilityKind.INT, {"minimum": 0, "maximum": 16, "default": 4}),
             "--spec-min-p": (CapabilityKind.FLOAT, {"minimum": 0.0, "maximum": 1.0, "default": 0.5}),
-            "--pool-workers": (CapabilityKind.INT, {"minimum": 1, "maximum": 256, "default": 0}),
-            "--kv-resident": (CapabilityKind.INT, {"minimum": 20480, "maximum": 131072}),
+            "--pool-workers": (CapabilityKind.INT, {"minimum": 0, "maximum": 256, "default": 0}),
+            "--kv-resident": (
+                CapabilityKind.INT,
+                {
+                    "minimum": 0,
+                    "maximum": 131072,
+                    "constraints": ("0 disables streaming; a non-zero value must be at least 20480.",),
+                },
+            ),
             "--kv-grow": (CapabilityKind.BOOL, {"default": False}),
             "--resident-experts": (CapabilityKind.BOOL, {"default": False}),
             "--mmap-experts": (CapabilityKind.BOOL, {"default": False}),
@@ -167,6 +265,9 @@ class StrataAdapter(InferenceAdapter):
                 {"legal_values": ("direct", "mmap", "ram"), "default": "direct"},
             ),
             "--gpu": (CapabilityKind.STRING, {"default": "0"}),
+            "--ple-gguf": (CapabilityKind.STRING, {}),
+            "--native": (CapabilityKind.STRING, {}),
+            "--expert-profile": (CapabilityKind.STRING, {}),
         }
         descriptors = []
         for key, (kind, extra) in spec.items():
@@ -249,19 +350,62 @@ class StrataAdapter(InferenceAdapter):
                 ),
                 ParameterDimension(
                     name="expert_cache",
-                    kind=DimensionKind.CATEGORICAL,
-                    choices=("auto", 0, 16, 32, 64),
-                    default="auto",
+                    kind=DimensionKind.INT,
+                    minimum=0,
+                    maximum=256,
+                    default=0,
+                    description="Resident expert blobs; 0 leaves the adaptive tier disabled.",
                 ),
                 ParameterDimension(
                     name="prefill",
                     kind=DimensionKind.CATEGORICAL,
-                    choices=("auto", 1024, 2048, 4096),
+                    choices=("auto", "auto:16384", "auto:32768", "1024", "2048", "4096", "8192"),
                     default="auto",
+                    description="Batched prompt chunk; observed values from the installed help.",
                 ),
                 ParameterDimension(name="spec", kind=DimensionKind.INT, minimum=0, maximum=8, default=4),
                 ParameterDimension(
-                    name="pool_workers", kind=DimensionKind.INT, minimum=1, maximum=32, default=15
+                    name="spec_min_p",
+                    kind=DimensionKind.FLOAT,
+                    minimum=0.0,
+                    maximum=1.0,
+                    default=0.5,
+                    description="MTP draft confidence required to extend a verify window.",
+                ),
+                ParameterDimension(
+                    name="pool_workers",
+                    kind=DimensionKind.INT,
+                    minimum=0,
+                    maximum=32,
+                    default=0,
+                    description="0 means every physical core except the host loop core.",
+                ),
+                ParameterDimension(
+                    name="kv_resident",
+                    kind=DimensionKind.CATEGORICAL,
+                    choices=(0, 20480, 32768, 65536),
+                    default=0,
+                    description="KV cells kept in VRAM; 0 keeps the whole KV cache resident.",
+                ),
+                ParameterDimension(
+                    name="kv_grow",
+                    kind=DimensionKind.CATEGORICAL,
+                    choices=(False, True),
+                    default=False,
+                    description="Allocate KV lazily as requests reach new cells.",
+                ),
+                ParameterDimension(
+                    name="batch",
+                    kind=DimensionKind.CATEGORICAL,
+                    choices=(1, 2, 4),
+                    default=1,
+                    description="Serve-mode batch slots; 1 keeps the single-request path.",
+                ),
+                ParameterDimension(
+                    name="ple_io",
+                    kind=DimensionKind.CATEGORICAL,
+                    choices=("direct", "mmap", "ram"),
+                    default="direct",
                 ),
                 ParameterDimension(
                     name="resident_experts",
@@ -297,6 +441,7 @@ class StrataAdapter(InferenceAdapter):
             "batch": "--batch",
             "ple_io": "--ple-io",
             "gpu": "--gpu",
+            "max_new": "--max-new",
         }
         errors: list[str] = []
         for name, value in candidate.parameters.items():
@@ -311,15 +456,14 @@ class StrataAdapter(InferenceAdapter):
             if capability.support is not SupportLevel.SUPPORTED:
                 errors.append(f"parameter {name!r} is not supported by the installed build")
                 continue
-            if capability.kind is CapabilityKind.ENUM and value not in capability.legal_values:
-                errors.append(f"{name}={value!r} is not one of {capability.legal_values}")
-            if capability.kind is CapabilityKind.INT:
-                if isinstance(value, bool) or not isinstance(value, int):
-                    errors.append(f"{name} must be an integer")
-                elif capability.minimum is not None and value < capability.minimum:
-                    errors.append(f"{name}={value} is below {capability.minimum}")
-                elif capability.maximum is not None and value > capability.maximum:
-                    errors.append(f"{name}={value} is above {capability.maximum}")
+            errors.extend(validate_capability_value(capability, name, value))
+            if (
+                name == "kv_resident"
+                and isinstance(value, int)
+                and not isinstance(value, bool)
+                and 0 < value < 20480
+            ):
+                errors.append("kv_resident must be 0 or at least 20480 cells")
         return tuple(errors)
 
     def build_microbench_plan(
@@ -350,43 +494,64 @@ class StrataAdapter(InferenceAdapter):
         base_args = model.metadata.get("base_args")
         if not isinstance(base_args, list) or not all(isinstance(item, str) for item in base_args):
             base_args = []
-        args = [
-            item
-            for item in base_args
-            if item
-            not in {"--max-context", "--kv", "--expert-cache", "--prefill", "--spec", "--pool-workers"}
-        ]
+        args = _strip_managed_args(base_args)
         args.extend(["--pack", pack_path])
         args.extend(["--max-context", str(int(candidate.context))])
-        if model.metadata.get("native"):
-            args.extend(["--native", str(model.metadata["native"])])
-        if model.metadata.get("ple_gguf"):
+        # ``native`` is a discovery marker in the model artifact, not a path.
+        # Only pass the observed ``--native SHARD1`` form when the worker found
+        # an actual shard path; never stringify a boolean into an engine flag.
+        native_shard = model.metadata.get("native_shard")
+        if (
+            isinstance(native_shard, str)
+            and native_shard
+            and native_shard.lower()
+            not in {
+                "true",
+                "false",
+            }
+        ):
+            args.extend(["--native", native_shard])
+        if isinstance(model.metadata.get("ple_gguf"), str):
             args.extend(["--ple-gguf", str(model.metadata["ple_gguf"])])
-        if model.metadata.get("mtp"):
-            args.extend(["--mtp", str(model.metadata["mtp"])])
-        if model.metadata.get("expert_profile"):
+        if isinstance(model.metadata.get("expert_profile"), str):
             args.extend(["--expert-profile", str(model.metadata["expert_profile"])])
         params = candidate.parameters
         if "kv" in params:
             args.extend(["--kv", str(params["kv"])])
         if "expert_cache" in params:
-            args.extend(["--expert-cache", str(params["expert_cache"])])
+            args.extend(["--expert-cache", str(_int(params, "expert_cache", 0))])
         if "prefill" in params:
             args.extend(["--prefill", str(params["prefill"])])
         if "spec" in params:
-            args.extend(["--spec", str(params["spec"])])
+            args.extend(["--spec", str(_int(params, "spec", 4))])
+        if "spec_min_p" in params:
+            args.extend(["--spec-min-p", str(_float(params, "spec_min_p", 0.5))])
         if "pool_workers" in params:
-            args.extend(["--pool-workers", str(params["pool_workers"])])
+            args.extend(["--pool-workers", str(_int(params, "pool_workers", 0))])
+        if "kv_resident" in params:
+            resident = _int(params, "kv_resident", 0)
+            if resident:
+                args.extend(["--kv-resident", str(resident)])
+        if _bool(params, "kv_grow", False):
+            args.append("--kv-grow")
+        if "batch" in params:
+            batch = _int(params, "batch", 1)
+            if batch > 1:
+                args.extend(["--batch", str(batch)])
+        if "ple_io" in params:
+            args.extend(["--ple-io", str(params["ple_io"])])
         if _bool(params, "resident_experts", False):
             args.append("--resident-experts")
         if _bool(params, "mmap_experts", False):
             args.append("--mmap-experts")
+        if "max_new" in params:
+            args.extend(["--max-new", str(_int(params, "max_new", 16))])
         profile: dict[str, object] = {
             "exe": engine_executable,
             "args": args,
             "cwd": cwd,
             "model_name": model.metadata.get("model_name") or model.model_id,
-            "gpu": _int(params, "gpu", 0),
+            "gpu": _gpu_value(params.get("gpu")),
             "lib_dirs": model.metadata.get("lib_dirs", []),
         }
         if isinstance(tokenizer, str):
@@ -459,6 +624,8 @@ class StrataAdapter(InferenceAdapter):
         if not isinstance(document, dict):
             raise ValueError("Strata /v1/status evidence must be a JSON object")
         timings = document.get("last_timings")
+        if timings is None:
+            timings = document.get("timings")
         context = document.get("context")
         unavailable: dict[str, str] = {}
         prefill = decode = ttft = total = None
@@ -475,11 +642,16 @@ class StrataAdapter(InferenceAdapter):
                 total = float(timings["prompt_ms"]) + float(timings.get("predicted_ms") or 0.0)
             unavailable["time_to_first_token_ms"] = "client-measured TTFT is not present in /v1/status"
         else:
-            for key in ("prefill_tokens_per_sec", "decode_tokens_per_sec", "total_latency_ms"):
+            for key in (
+                "prefill_tokens_per_sec",
+                "decode_tokens_per_sec",
+                "time_to_first_token_ms",
+                "total_latency_ms",
+            ):
                 unavailable[key] = "no last_timings block was present"
-        effective = None
+        effective = document.get("n_ctx")
         if isinstance(context, dict):
-            effective = context.get("native") or context.get("max_positions")
+            effective = effective or context.get("native") or context.get("max_positions")
         machine = document.get("machine")
         gpu = machine.get("gpu") if isinstance(machine, dict) else None
         vram = None

@@ -1,9 +1,11 @@
-# Architecture — Phase 0/1 foundation plus Phase 2 worker
+# Architecture — Phase 0/1 foundation, Phase 2 worker, Phase 3 adapters
 
 Status: Phase 1 is complete and verified. Phase 2 adds a production Linux worker
 with observed engine/model discovery, native process execution, GPU UUID leases,
-journals, sandboxes and a real executor. The simulated lane remains separate and
-its evidence can never qualify a recipe.
+journals, sandboxes and a real executor. Phase 3 productionizes the two adapters
+against the installed llama.cpp and Strata builds and adds offline conformance
+tests. The simulated lane remains separate and its evidence can never qualify a
+recipe.
 
 ## 1. Process topology
 
@@ -259,12 +261,46 @@ Recovery rules:
   streaming OpenAI-compatible serving measurement. Missing metrics remain
   missing; a native-only run is `screening_only`. Observations always carry
   `simulated=false` on the real lane.
+- **Adapter evidence parsing** interprets `/props` or `/v1/status` for context
+  identity and engine-specific fields. Client-observed TTFT, latency and usage
+  keep precedence; a status document is never used to invent a peak VRAM or
+  throughput value.
 
-## 12. Phase boundary
+## 12. Adapter conformance (Phase 3)
+
+- **Observed means observed.** `observed_flags` reads only help lines that begin
+  an option. A flag merely mentioned in prose is not a capability. The
+  llama.cpp adapter checks the server and `llama-bench` help separately and
+  requires the flags used by each plan before the combined manifest is accepted.
+- **Typed validation.** Candidate values are validated against the observed
+  descriptor kind: booleans are not integers, numeric strings are not numbers,
+  enum values must be listed, floats must be finite, and integer/float bounds are
+  enforced. Unknown parameters fail instead of reaching argv.
+- **llama.cpp plans.** Server flags include `--model`, `--ctx-size`, `--host`,
+  `--port`; native `llama-bench` requires `--n-prompt`, `--n-gen`, `--n-depth`,
+  `--repetitions` and `--output`. Every emitted server flag is present in server
+  help, and every emitted native flag is present in bench help.
+- **Strata installed surface.** The adapter models only the observed
+  `0.1.44.1` CLI plus the installed Python server/profile JSON. It does not
+  synthesize `models list`, `models inspect`, `doctor`, `engine calibrate` or
+  `bench run`. `--expert-cache` is an integer defaulting to `0`;
+  `--pool-workers=0` means all physical cores; `--kv-resident` is `0` or at
+  least `20480`; `--batch` is opt-in.
+- **Strata profiles.** Adapter-managed base args are removed before typed values
+  are re-emitted, preventing duplicate or conflicting flags. `native: true` in
+  model metadata is a discovery marker, not a path: only an explicit
+  `native_shard` produces `--native SHARD1`. The unobserved `--mtp` form is not
+  emitted.
+- **Full-context honesty.** Strata full-context proof remains `INCONCLUSIVE`
+  until the Phase 4 serving harness. The installed build's missing calibration
+  commands are recorded as a boundary, not replaced with a guessed command.
+
+## 13. Phase boundary
 
 Phases 0/1 prove protocol, persistence, planning, lifecycle, recovery and
 pure-adapter behavior. Phase 2 proves the worker-owned process, discovery, GPU
-lease and command execution machinery. It does **not** yet prove real
-llama.cpp/Strata performance, quality, statistical finalization or validated
-recipes. Phase 3 productionizes both adapters; Phase 4 adds benchmark lanes and
-evidence; Phase 5 adds search/finalization; Phase 6 adds the UI.
+lease and command execution machinery. Phase 3 proves adapter conformance
+against the installed help/version/evidence fixtures and the observed live
+surface; it still does **not** prove real llama.cpp/Strata performance, quality,
+statistical finalization or validated recipes. Phase 4 adds benchmark lanes and
+real evidence; Phase 5 adds search/finalization; Phase 6 adds the UI.

@@ -6,6 +6,7 @@ journals and measurement parsing. Pure adapters only translate typed plans.
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from pathlib import Path
@@ -812,6 +813,31 @@ class RealExecutor:
             raw.extend(server_run.artifacts if server_run else ())
             telemetry_summary.samples.extend(serving.telemetry.samples)
             telemetry_summary.errors.extend(serving.telemetry.errors)
+            if serving.status_document:
+                # The adapter owns engine-specific interpretation of /props or
+                # /v1/status. It may fill context identity, never client-observed
+                # throughput or a peak VRAM value.
+                try:
+                    parsed_status = self._bundle(
+                        payload.engine.engine_id.value
+                    ).adapter.parse_server_evidence(
+                        RawEvidence(
+                            evidence_id=f"{payload.candidate_id}-status",
+                            path=f"server-status:{payload.candidate_id}",
+                            content_type="application/json",
+                            text=json.dumps(serving.status_document, sort_keys=True),
+                        ),
+                        None,
+                        candidate,
+                    )
+                    if effective is None:
+                        effective = parsed_status.context_effective
+                    notes.append(
+                        "server status parsed by the engine adapter for context identity; "
+                        "client-observed throughput keeps precedence"
+                    )
+                except Exception as exc:
+                    notes.append(f"server status parser refused the document: {type(exc).__name__}: {exc}")
             if serving.completed:
                 derived = derive_serving_metrics(serving)
                 metrics = metrics.model_copy(

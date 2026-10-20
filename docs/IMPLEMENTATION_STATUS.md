@@ -15,7 +15,8 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 | Controller persistence | Implemented | FastAPI + SQLAlchemy 2.x + SQLite WAL + Alembic; initial revision `b151f9870480`. |
 | Separate optimizer process | Implemented | `lab_optimizer` owns Optuna and a distinct SQLite URL. FastAPI imports no Optuna. |
 | Durable worker protocol | Implemented | Poll, lease, ack, renewal, complete, idempotent replay, conflict `409`, lease expiry/requeue. |
-| Engine adapters | Implemented, pure | llama.cpp and Strata help/JSON parsers and typed plan builders. No subprocess/network/filesystem I/O; a test enforces imports. |
+| Engine adapters | Implemented, pure | llama.cpp and Strata help/JSON parsers, typed validation and plan builders, productionized against the installed builds. No subprocess/network/filesystem I/O; a test enforces imports. |
+| Adapter conformance | Implemented, offline | Golden server/bench/status fixtures, option-line capability parsing, strict candidate types, split llama.cpp help checks, Strata profile de-duplication and generated-file digest tests. |
 | Planning | Implemented, snapshot-only | Cached snapshots; stale/missing inventory returns `202 PREFLIGHT_REQUIRED` plus a queued `SCAN`. |
 | Real Linux worker | Implemented | Observed engine/model discovery, hardware/GPU telemetry, SHA-256 cache, sandboxes, journal, GPU UUID `flock` leases, argv-only runner, crash recovery, cancellation. |
 | Real command handlers | Implemented | `SCAN`, `PREFLIGHT`, `CLAIM_TRIAL`, `PAUSE`, `CANCEL`, `VERIFY_RECIPE`; `PROMOTE` is dry-run/idempotent only. |
@@ -77,6 +78,9 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 - llama.cpp trials collect native `llama-bench` metrics where present and a
   streaming `/v1/chat/completions` serving lane. Missing metrics stay missing;
   native-only evidence is `screening_only`.
+- The engine adapter parses server `/props` or `/v1/status` for context identity
+  and engine fields. Client-observed TTFT/usage keep precedence; a status
+  document is not treated as measured peak VRAM or throughput.
 - Preflight starts a CPU-offload (`--n-gpu-layers 0`) server at the highest
   supported requested context and records the effective context. This proves
   allocation at that context, **not** GPU residency. Lower requested contexts
@@ -97,13 +101,13 @@ uv run ruff check
 # All checks passed!
 
 uv run ruff format --check
-# 105 files already formatted
+# 106 files already formatted
 
 uv run mypy python
 # Success: no issues found in 90 source files
 
 uv run pytest -q
-# 25 passed in 7.91s
+# 33 passed in 7.59s
 
 uv run python scripts/check_contracts.py
 # contracts are current
@@ -123,8 +127,16 @@ The installed engines were probed through the real worker discovery code:
 
 ```text
 ENGINE llamacpp 0.7.0-dev build 701 commit dd002b91f sha256 f0f8a33ee87c...
+  26 descriptors; server and bench help hashes recorded separately; no warnings
 ENGINE strata   0.1.44.1  build 0.1.44.1 sha256 fa29349e3eaa...
+  19 descriptors; version/help read from stderr; no warnings
 ```
+
+The adapter conformance suite parses the committed installed-build fixtures and
+checks that every emitted server flag appears in server help, every emitted
+native flag appears in `llama-bench` help, invalid candidate types fail, Strata
+profiles contain no duplicated managed flags and generated-file digests match.
+It does not launch an engine.
 
 The configured model root produced 8 artifacts without hashing: 6 GGUF models
 (GLM-4.7-Flash-Q4_K_M, Qwen3.8-27B-UD-IQ4_XS,
@@ -157,7 +169,10 @@ Optuna lifecycle, simulated trials, recipe rejection for simulation, idempotency
 conflicts, SSE gap replay, and command lease/ack/completion resilience. Phase 2
 unit coverage uses a synthetic GGUF file, the trusted Python interpreter, fake
 probe scripts, GPU lease exclusivity, runner success/timeout/cancel and journal
-crash recovery. No test requires a GPU, downloaded weights or a live engine.
+crash recovery. Phase 3 adds offline golden conformance tests for installed
+llama.cpp server/bench output, Strata stderr help/status output, typed candidate
+rejection, profile de-duplication and generated-file digest checks. No test
+requires a GPU, downloaded weights or a live engine.
 
 ## 5. What is not proven
 
@@ -170,6 +185,11 @@ These are intentional boundaries, not hidden gaps:
   installed.
 - Strata full-context proof is `INCONCLUSIVE` pending the Phase 4 serving
   harness. Its native benchmark command is not exposed by the installed build.
+- Model discovery records the Strata pack and a `native: true` marker but does
+  not yet resolve the source GGUF shard path. The adapter therefore refuses to
+  stringify that marker into `--native True`; it emits `--native SHARD1` only
+  when an explicit `native_shard` is present. The unobserved `--mtp` form is not
+  emitted.
 - `PAUSE` currently stops the active trial at the process-group boundary; it is
   not a resumable checkpoint. Safe-boundary pause is a Phase 5/lifecycle item.
 - Simulated throughput, VRAM/telemetry and OOM values are deterministic test
@@ -221,8 +241,9 @@ engines/models and GPU access; the simulated lane needs neither.
 
 ## 8. Next gate
 
-Phase 3 productionizes the llama.cpp and Strata adapters against the installed
-builds and adds adapter conformance coverage. The open Phase 2 evidence items
-(full model hashing, a real preflight and one real low-impact trial) must be
-executed before any Phase 5 recipe can be considered. See
-`docs/NEXT_STEPS.md` and `docs/progress/PHASE_2_REPORT.md`.
+Phase 3 is complete at the adapter/contract boundary and committed locally.
+Phase 4 adds the benchmark corpora, real serving/full-context work and evidence
+collection. The open Phase 2/3 evidence items (full model hashing, a real
+preflight, one real low-impact trial and Strata native-shard resolution) must be
+executed before any Phase 5 recipe can be considered. See `docs/NEXT_STEPS.md`,
+`docs/progress/PHASE_2_REPORT.md` and `docs/progress/PHASE_3_REPORT.md`.

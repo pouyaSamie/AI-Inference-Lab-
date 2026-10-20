@@ -1,0 +1,22 @@
+{
+  "context": {
+    "native": 32768,
+    "max_positions": 262144
+  },
+  "last_timings": {
+    "prompt_n": 29491,
+    "prompt_ms": 812.5,
+    "prompt_per_second": 3630.1,
+    "predicted_n": 128,
+    "predicted_ms": 1600.0,
+    "predicted_per_second": 80.0,
+    "cache_n": 0
+  },
+  "machine": {
+    "gpu": {
+      "used_mib": 10123.5,
+      "util_pct": 97.0,
+      "temp_c": 64.0
+    }
+  }
+}

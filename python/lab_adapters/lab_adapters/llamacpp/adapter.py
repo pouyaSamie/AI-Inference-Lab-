@@ -70,6 +70,7 @@ from ..base.parsing import (
     probe_command,
     require_flags,
     server_readiness,
+    validate_capability_value,
 )
 from ..base.protocol import InferenceAdapter
 from ..base.results import ValidatedEvidence
@@ -135,7 +136,19 @@ class LlamaCppAdapter(InferenceAdapter):
         self, outputs: tuple[ProcessOutput, ...], binary: RegisteredBinary
     ) -> EngineCapabilityManifest:
         version_text = "\n".join(output.stdout + "\n" + output.stderr for output in outputs)
-        help_text = "\n".join(output.stdout for output in outputs)
+        server_outputs = tuple(output for output in outputs if "bench" not in output.command_id.lower())
+        bench_outputs = tuple(output for output in outputs if "bench" in output.command_id.lower())
+        # A caller that supplies only one probe pair (for example the simulated
+        # inventory or a unit test) is treated as describing both binaries. The
+        # real worker uses distinct ``probe-llama-server-*`` and
+        # ``probe-llama-bench-*`` command IDs.
+        if not bench_outputs:
+            bench_outputs = outputs
+        if not server_outputs:
+            server_outputs = outputs
+        server_help = "\n".join(output.stdout + "\n" + output.stderr for output in server_outputs)
+        bench_help = "\n".join(output.stdout + "\n" + output.stderr for output in bench_outputs)
+        help_text = f"{server_help}\n{bench_help}"
         match = _VERSION_RE.search(version_text)
         if not match:
             raise ValueError("could not parse llama.cpp version output; refusing to guess capabilities")
@@ -153,10 +166,24 @@ class LlamaCppAdapter(InferenceAdapter):
             executable_sha256=binary.sha256,
             source_commit=match.group("commit"),
         )
-        flags = observed_flags(help_text)
-        require_flags(flags, ("--model",))
+        server_flags = observed_flags(server_help)
+        bench_flags = observed_flags(bench_help)
+        require_flags(server_flags, ("--model", "--ctx-size", "--host", "--port"))
+        require_flags(
+            bench_flags,
+            (
+                "--model",
+                "--n-prompt",
+                "--n-gen",
+                "--n-depth",
+                "--repetitions",
+                "--output",
+            ),
+        )
+        flags = server_flags | bench_flags
         descriptors = []
         spec: dict[str, tuple[CapabilityKind, dict[str, Any]]] = {
+            "--model": (CapabilityKind.STRING, {}),
             "--ctx-size": (CapabilityKind.INT, {"minimum": 512, "maximum": 131072, "default": 0}),
             "--n-gpu-layers": (CapabilityKind.INT, {"minimum": -1, "maximum": 4096, "default": -1}),
             "--threads": (CapabilityKind.INT, {"minimum": 1, "maximum": 256, "default": -1}),
@@ -213,7 +240,15 @@ class LlamaCppAdapter(InferenceAdapter):
                 continue
             impact = (
                 ImpactClass.P0
-                if key in {"--n-gpu-layers", "--ctx-size", "--flash-attn", "--cache-type-k", "--cache-type-v"}
+                if key
+                in {
+                    "--model",
+                    "--n-gpu-layers",
+                    "--ctx-size",
+                    "--flash-attn",
+                    "--cache-type-k",
+                    "--cache-type-v",
+                }
                 else ImpactClass.P1
             )
             descriptors.append(
@@ -235,6 +270,10 @@ class LlamaCppAdapter(InferenceAdapter):
                 f"compiler/platform: {built.group('compiler') if built else 'unknown'}",
                 "Presence of a flag is observed; legal enum values are versioned approved "
                 "rules where help omits them.",
+                f"server_help_sha256={sha256_text(server_help)}",
+                f"bench_help_sha256={sha256_text(bench_help)}",
+                "Required server and llama-bench flags were checked against their respective "
+                "help output before this manifest was accepted.",
             ),
         )
 
@@ -381,6 +420,10 @@ class LlamaCppAdapter(InferenceAdapter):
             "load_mode": "--load-mode",
             "split_mode": "--split-mode",
             "metrics": "--metrics",
+            "prompt_tokens": "--n-prompt",
+            "n_gen": "--n-gen",
+            "n_depth": "--n-depth",
+            "repetitions": "--repetitions",
         }
         for name, value in candidate.parameters.items():
             flag = mapping.get(name)
@@ -396,15 +439,7 @@ class LlamaCppAdapter(InferenceAdapter):
             if capability.support is not SupportLevel.SUPPORTED:
                 errors.append(f"parameter {name!r} is not supported by the installed build")
                 continue
-            if capability.kind is CapabilityKind.ENUM and value not in capability.legal_values:
-                errors.append(f"{name}={value!r} is not one of {capability.legal_values}")
-            if capability.kind is CapabilityKind.INT:
-                if isinstance(value, bool) or not isinstance(value, int):
-                    errors.append(f"{name} must be an integer")
-                elif capability.minimum is not None and value < capability.minimum:
-                    errors.append(f"{name}={value} is below {capability.minimum}")
-                elif capability.maximum is not None and value > capability.maximum:
-                    errors.append(f"{name}={value} is above {capability.maximum}")
+            errors.extend(validate_capability_value(capability, name, value))
         return tuple(errors)
 
     # ----------------------------------------------------------------- plans
@@ -418,6 +453,7 @@ class LlamaCppAdapter(InferenceAdapter):
         prompt_tokens = _as_int(params, "prompt_tokens", min(2048, max(128, int(candidate.context) // 4)))
         gen_tokens = _as_int(params, "n_gen", 256)
         depth = _as_int(params, "n_depth", 0)
+        runs = _as_int(params, "repetitions", repetitions)
         args = [
             "-m",
             self._model_path(model),
@@ -428,7 +464,7 @@ class LlamaCppAdapter(InferenceAdapter):
             "-d",
             str(depth),
             "-r",
-            str(repetitions),
+            str(runs),
             "-o",
             "json",
         ]
@@ -618,9 +654,15 @@ class LlamaCppAdapter(InferenceAdapter):
         else:
             unavailable["prefill_tokens_per_sec"] = "no per-request timings block in status evidence"
             unavailable["decode_tokens_per_sec"] = "no per-request timings block in status evidence"
+            unavailable["time_to_first_token_ms"] = "no per-request timings block in status evidence"
             unavailable["total_latency_ms"] = "no per-request timings block in status evidence"
         effective = None
-        if isinstance(context, dict):
+        if isinstance(document, dict):
+            generation = document.get("default_generation_settings")
+            effective = document.get("n_ctx")
+            if effective is None and isinstance(generation, dict):
+                effective = generation.get("n_ctx")
+        if effective is None and isinstance(context, dict):
             effective = context.get("native") or context.get("max_positions")
         return ServingObservation(
             engine_id=EngineId.LLAMACPP.value,
@@ -729,10 +771,18 @@ class LlamaCppAdapter(InferenceAdapter):
             "cache_type_k": "--cache-type-k",
             "cache_type_v": "--cache-type-v",
             "parallel": "--parallel",
+            "load_mode": "--load-mode",
+            "split_mode": "--split-mode",
         }
         for name, flag in mapping.items():
             if name in params:
                 args.extend((flag, str(params[name])))
+        if _as_bool(params, "kv_unified", False):
+            args.append("--kv-unified")
+        if "kv_unified_per_slot" in params:
+            args.extend(("--kv-unified-per-slot", str(_as_int(params, "kv_unified_per_slot", 4096))))
+        if _as_bool(params, "metrics", False):
+            args.append("--metrics")
         return args
 
     def assess_context_feasibility(

@@ -13,7 +13,8 @@ Implemented now:
 - frozen Pydantic v2 contracts in `lab_core`, including execution plans;
 - independently supervised Optuna process (`lab_optimizer`) using its own SQLite store;
 - durable worker command queue with outbound polling, leases, renewal, acks and idempotent completions;
-- pure `llamacpp` and `strata` adapter translators/parsers;
+- pure `llamacpp` and `strata` adapter translators/parsers, productionized
+  against the installed builds with offline golden conformance tests;
 - real Linux worker: observed engine/model discovery, SHA-256 hash cache, hardware telemetry, sandboxes, journal, GPU UUID `flock` leases, argv-only process runner, crash recovery and real executor;
 - explicit **simulated** worker executor and end-to-end tests;
 - deterministic OpenAPI/JSON-Schema/TypeScript contract generation;
