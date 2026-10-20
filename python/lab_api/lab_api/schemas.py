@@ -40,6 +40,7 @@ from lab_core import (
     WorkloadSuite,
 )
 
+
 class PlanRequest(FrozenModel):
     worker_id: Identifier
     engine_id: EngineId
@@ -139,6 +140,15 @@ class WorkerSnapshotResponse(FrozenModel):
     stale: bool = False
 
 
+class PollRequest(FrozenModel):
+    max_commands: int = Field(default=5, ge=1, le=50)
+
+
+class OptimizerPollRequest(FrozenModel):
+    max_requests: int = Field(default=5, ge=1, le=50)
+    optimizer_id: Identifier | None = None
+
+
 class HeartbeatRequest(FrozenModel):
     health: WorkerHealth
     active_leases: tuple[str, ...] = ()
@@ -186,7 +196,7 @@ class RecipeView(FrozenModel):
     experiment_id: Identifier
     candidate_id: Identifier
     status: str
-    digest: Sha256
+    recipe_digest: Sha256
     recipe: dict[str, Any]
     created_at: AwareTimestamp
 

@@ -86,7 +86,9 @@ def unsupported_flags(observed: Iterable[str], required: Sequence[str]) -> list[
     return sorted(set(required) - set(observed))
 
 
-def probe_command(binary: RegisteredBinary, args: Sequence[str], schema: str, timeout: int = 30) -> CommandSpec:
+def probe_command(
+    binary: RegisteredBinary, args: Sequence[str], schema: str, timeout: int = 30
+) -> CommandSpec:
     return CommandSpec(
         executable_id=binary.executable_id,
         executable_sha256=binary.sha256,

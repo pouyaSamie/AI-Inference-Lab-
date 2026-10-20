@@ -118,9 +118,7 @@ class JobState(StrEnum):
     BLOCKED = "blocked"
 
 
-TERMINAL_JOB_STATES = frozenset(
-    {JobState.CANCELLED, JobState.COMPLETED, JobState.FAILED, JobState.BLOCKED}
-)
+TERMINAL_JOB_STATES = frozenset({JobState.CANCELLED, JobState.COMPLETED, JobState.FAILED, JobState.BLOCKED})
 
 
 class JobStage(StrEnum):

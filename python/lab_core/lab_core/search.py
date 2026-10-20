@@ -60,9 +60,8 @@ class ParameterDimension(FrozenModel):
 
     @model_validator(mode="after")
     def _validate_dimension(self) -> ParameterDimension:
-        if self.kind in (DimensionKind.CATEGORICAL, DimensionKind.BOOL):
-            if not self.choices:
-                raise ValueError(f"dimension {self.name!r} requires choices")
+        if self.kind in (DimensionKind.CATEGORICAL, DimensionKind.BOOL) and not self.choices:
+            raise ValueError(f"dimension {self.name!r} requires choices")
         if self.kind in (DimensionKind.INT, DimensionKind.FLOAT):
             if self.minimum is None or self.maximum is None:
                 raise ValueError(f"numeric dimension {self.name!r} requires minimum and maximum")
@@ -113,10 +112,18 @@ def _condition_matches(condition: SearchCondition, value: JsonScalar) -> bool:
     if condition.operator is ConditionOperator.NOT_IN:
         return value not in condition.values
     if condition.operator is ConditionOperator.GTE:
-        return isinstance(value, (int, float)) and isinstance(condition.values[0], (int, float)) and value >= condition.values[0]
+        return (
+            isinstance(value, (int, float))
+            and isinstance(condition.values[0], (int, float))
+            and value >= condition.values[0]
+        )
     if condition.operator is ConditionOperator.LTE:
-        return isinstance(value, (int, float)) and isinstance(condition.values[0], (int, float)) and value <= condition.values[0]
-    return False
+        return (
+            isinstance(value, (int, float))
+            and isinstance(condition.values[0], (int, float))
+            and value <= condition.values[0]
+        )
+    return False  # type: ignore[unreachable]
 
 
 class SearchSpaceRequest(FrozenModel):

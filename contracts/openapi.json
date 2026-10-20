@@ -1,0 +1,7237 @@
+{
+  "components": {
+    "schemas": {
+      "AckDisposition": {
+        "enum": [
+          "accepted",
+          "rejected"
+        ],
+        "title": "AckDisposition",
+        "type": "string"
+      },
+      "AckResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "lease_generation": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "status",
+          "lease_generation"
+        ],
+        "title": "AckResponse",
+        "type": "object"
+      },
+      "AskPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_limit": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 32
+          },
+          "context_tokens": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "kind": {
+            "const": "ASK",
+            "default": "ASK",
+            "title": "Kind",
+            "type": "string"
+          },
+          "study_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "study_name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "workload_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          }
+        },
+        "required": [
+          "study_id",
+          "study_name",
+          "context_tokens",
+          "workload_digest"
+        ],
+        "title": "AskPayload",
+        "type": "object"
+      },
+      "AskResult": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "ASK_RESULT",
+            "default": "ASK_RESULT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/Parameters"
+          },
+          "study_name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "trial_number": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "study_name",
+          "trial_number",
+          "parameters"
+        ],
+        "title": "AskResult",
+        "type": "object"
+      },
+      "AwareTimestamp": {
+        "format": "date-time",
+        "type": "string"
+      },
+      "Backend": {
+        "enum": [
+          "cuda",
+          "cpu",
+          "metal",
+          "vulkan",
+          "rocm",
+          "unknown"
+        ],
+        "title": "Backend",
+        "type": "string"
+      },
+      "BenchMetrics": {
+        "additionalProperties": false,
+        "properties": {
+          "cache_hit": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Hit"
+          },
+          "cold_start_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cold Start Ms"
+          },
+          "cpu_rss_peak_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Rss Peak Bytes"
+          },
+          "decode_tokens_per_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decode Tokens Per Sec"
+          },
+          "energy_joules": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Energy Joules"
+          },
+          "gpu_mem_clock_mhz": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Mem Clock Mhz"
+          },
+          "gpu_memory_utilization": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Memory Utilization"
+          },
+          "gpu_power_average_w": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Power Average W"
+          },
+          "gpu_sm_clock_mhz": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Sm Clock Mhz"
+          },
+          "gpu_temperature_max_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Temperature Max C"
+          },
+          "gpu_utilization": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Utilization"
+          },
+          "gpu_vram_peak_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Vram Peak Bytes"
+          },
+          "model_load_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Load Sec"
+          },
+          "prefill_tokens_per_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefill Tokens Per Sec"
+          },
+          "server_ready_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Ready Ms"
+          },
+          "system_ram_available_min_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Ram Available Min Bytes"
+          },
+          "time_to_first_token_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To First Token Ms"
+          },
+          "total_latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Latency Ms"
+          },
+          "unavailable_reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Unavailable Reasons",
+            "type": "object"
+          }
+        },
+        "title": "BenchMetrics",
+        "type": "object"
+      },
+      "BenchmarkObservation": {
+        "additionalProperties": false,
+        "description": "Immutable normalized evidence for one candidate/context/attempt.\n\n``observation_id`` is deterministic over candidate, attempt, evidence\nlane and context. The controller uses it as the idempotency key for\nduplicate worker completions.",
+        "properties": {
+          "attempt": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "candidate_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "configured_context": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configured Context"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ContextLength"
+          },
+          "dispersion": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Dispersion",
+            "type": "object"
+          },
+          "effective_context": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Context"
+          },
+          "engine_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "engine_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "evidence_kind": {
+            "$ref": "#/components/schemas/EvidenceKind"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "measurement_status": {
+            "$ref": "#/components/schemas/MeasurementStatus"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/BenchMetrics"
+          },
+          "model_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "observation_id": {
+            "$ref": "#/components/schemas/Identifier",
+            "default": ""
+          },
+          "observed_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "LAB-BENCH-v1"
+          },
+          "quality_gates": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/QualityGate"
+            },
+            "title": "Quality Gates",
+            "type": "array"
+          },
+          "raw_evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RawEvidenceRef"
+            },
+            "title": "Raw Evidence",
+            "type": "array"
+          },
+          "repetitions": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 1
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "simulated": {
+            "default": false,
+            "title": "Simulated",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ObservationStatus"
+          },
+          "study_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "telemetry": {
+            "$ref": "#/components/schemas/TelemetryCoverage"
+          },
+          "trial_number": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "workload_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "study_id",
+          "candidate_id",
+          "trial_number",
+          "worker_id",
+          "engine_id",
+          "engine_sha256",
+          "model_digest",
+          "workload_digest",
+          "context",
+          "evidence_kind",
+          "measurement_status",
+          "status"
+        ],
+        "title": "BenchmarkObservation",
+        "type": "object"
+      },
+      "CancelPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "CANCEL",
+            "default": "CANCEL",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "grace_seconds": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 10
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "terminate_owned_processes": {
+            "default": true,
+            "title": "Terminate Owned Processes",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "experiment_id"
+        ],
+        "title": "CancelPayload",
+        "type": "object"
+      },
+      "CancelResult": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "command_type": {
+            "const": "CANCEL",
+            "default": "CANCEL",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "terminated_owned_pids": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Terminated Owned Pids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "accepted"
+        ],
+        "title": "CancelResult",
+        "type": "object"
+      },
+      "CandidateSpec": {
+        "additionalProperties": false,
+        "description": "A concrete, reproducible parameter vector for one trial and context.\n\n``candidate_id`` is deterministic over engine hash, model digest, worker,\ncontext, workload digest and parameters, which makes duplicate proposals\ndetectable across controller and optimizer restarts.",
+        "properties": {
+          "candidate_id": {
+            "$ref": "#/components/schemas/Identifier",
+            "default": ""
+          },
+          "context": {
+            "$ref": "#/components/schemas/ContextLength"
+          },
+          "engine_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "engine_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "model_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "parameter_digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/Parameters"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CandidateState",
+            "default": "proposed"
+          },
+          "study_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "trial_number": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "workload_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          }
+        },
+        "required": [
+          "study_id",
+          "experiment_id",
+          "trial_number",
+          "engine_id",
+          "engine_sha256",
+          "model_digest",
+          "worker_id",
+          "context",
+          "workload_digest"
+        ],
+        "title": "CandidateSpec",
+        "type": "object"
+      },
+      "CandidateState": {
+        "enum": [
+          "proposed",
+          "claimed",
+          "observed",
+          "infeasible",
+          "failed",
+          "finalized",
+          "discarded"
+        ],
+        "title": "CandidateState",
+        "type": "string"
+      },
+      "CapabilityDescriptor": {
+        "additionalProperties": false,
+        "description": "One observed, typed engine parameter.\n\nFlags absent from the installed binary must not be represented as\nsupported. ``provenance`` records how support was established.",
+        "properties": {
+          "constraints": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Constraints",
+            "type": "array"
+          },
+          "default": {
+            "$ref": "#/components/schemas/JsonScalar"
+          },
+          "impact_class": {
+            "$ref": "#/components/schemas/ImpactClass",
+            "default": "P2"
+          },
+          "incompatibilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Incompatibilities",
+            "type": "array"
+          },
+          "key": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CapabilityKind"
+          },
+          "legal_values": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JsonScalar"
+            },
+            "title": "Legal Values",
+            "type": "array"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/CapabilityProvenance",
+            "default": "observed_cli"
+          },
+          "quality_risk": {
+            "default": false,
+            "title": "Quality Risk",
+            "type": "boolean"
+          },
+          "restart_required": {
+            "default": false,
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "support": {
+            "$ref": "#/components/schemas/SupportLevel",
+            "default": "supported"
+          }
+        },
+        "required": [
+          "key",
+          "kind"
+        ],
+        "title": "CapabilityDescriptor",
+        "type": "object"
+      },
+      "CapabilityKind": {
+        "enum": [
+          "bool",
+          "int",
+          "float",
+          "enum",
+          "string"
+        ],
+        "title": "CapabilityKind",
+        "type": "string"
+      },
+      "CapabilityProvenance": {
+        "enum": [
+          "observed_cli",
+          "observed_server_api",
+          "approved_rule",
+          "installed_manifest",
+          "unverified"
+        ],
+        "title": "CapabilityProvenance",
+        "type": "string"
+      },
+      "ClaimTrialPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "command_type": {
+            "const": "CLAIM_TRIAL",
+            "default": "CLAIM_TRIAL",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ContextLength"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineIdentity"
+          },
+          "expected_snapshot_revision": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "gpu_uuids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Gpu Uuids",
+            "type": "array"
+          },
+          "lease_generation": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelArtifact"
+          },
+          "parameter_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/Parameters"
+          },
+          "simulation_only": {
+            "default": false,
+            "title": "Simulation Only",
+            "type": "boolean"
+          },
+          "study_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "timeout_seconds": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 7200
+          },
+          "trial_number": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "workload_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "study_id",
+          "candidate_id",
+          "trial_number",
+          "context",
+          "parameters",
+          "parameter_digest",
+          "workload_digest",
+          "engine",
+          "model",
+          "lease_generation",
+          "expected_snapshot_revision"
+        ],
+        "title": "ClaimTrialPayload",
+        "type": "object"
+      },
+      "CommandAck": {
+        "additionalProperties": false,
+        "properties": {
+          "disposition": {
+            "$ref": "#/components/schemas/AckDisposition"
+          },
+          "lease_generation": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "lease_token": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "required": [
+          "lease_token",
+          "disposition",
+          "lease_generation"
+        ],
+        "title": "CommandAck",
+        "type": "object"
+      },
+      "CommandCompletion": {
+        "additionalProperties": false,
+        "properties": {
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lease_generation": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "lease_token": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/CommandStatus"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "CANCEL": "#/components/schemas/CancelResult",
+                    "CLAIM_TRIAL": "#/components/schemas/TrialResult",
+                    "PAUSE": "#/components/schemas/PauseResult",
+                    "PREFLIGHT": "#/components/schemas/PreflightResult",
+                    "PROMOTE": "#/components/schemas/PromoteResult",
+                    "SCAN": "#/components/schemas/ScanResult",
+                    "VERIFY_RECIPE": "#/components/schemas/VerifyRecipeResult"
+                  },
+                  "propertyName": "command_type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ScanResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PreflightResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TrialResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PauseResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CancelResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VerifyRecipeResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PromoteResult"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "worker_id",
+          "lease_token",
+          "lease_generation",
+          "outcome"
+        ],
+        "title": "CommandCompletion",
+        "type": "object"
+      },
+      "CommandFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonScalar"
+            },
+            "title": "Details",
+            "type": "object"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FailureKind",
+            "default": "UNKNOWN"
+          },
+          "message": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "retryable": {
+            "default": false,
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "CommandFailure",
+        "type": "object"
+      },
+      "CommandStatus": {
+        "enum": [
+          "pending",
+          "leased",
+          "acknowledged",
+          "running",
+          "completed",
+          "failed",
+          "rejected",
+          "expired",
+          "cancelled"
+        ],
+        "title": "CommandStatus",
+        "type": "string"
+      },
+      "CommandType": {
+        "enum": [
+          "SCAN",
+          "PREFLIGHT",
+          "CLAIM_TRIAL",
+          "PAUSE",
+          "CANCEL",
+          "VERIFY_RECIPE",
+          "PROMOTE"
+        ],
+        "title": "CommandType",
+        "type": "string"
+      },
+      "CompletionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "experiment_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experiment State"
+          },
+          "idempotent_replay": {
+            "default": false,
+            "title": "Idempotent Replay",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "status"
+        ],
+        "title": "CompletionResponse",
+        "type": "object"
+      },
+      "ConditionOperator": {
+        "enum": [
+          "eq",
+          "neq",
+          "in",
+          "not_in",
+          "gte",
+          "lte"
+        ],
+        "title": "ConditionOperator",
+        "type": "string"
+      },
+      "ContextFeasibility": {
+        "additionalProperties": false,
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/ContextLength"
+          },
+          "estimated_vram_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Vram Bytes"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "requires_full_context_proof": {
+            "default": true,
+            "title": "Requires Full Context Proof",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FeasibilityOutcome",
+            "default": "unknown"
+          }
+        },
+        "required": [
+          "context"
+        ],
+        "title": "ContextFeasibility",
+        "type": "object"
+      },
+      "ContextLength": {
+        "enum": [
+          4096,
+          8192,
+          16384,
+          32768,
+          65536,
+          131072
+        ],
+        "title": "ContextLength",
+        "type": "integer"
+      },
+      "CreateExperimentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/ExperimentPlan"
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "title": "CreateExperimentRequest",
+        "type": "object"
+      },
+      "CreateStudyPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "default": "maximize",
+            "enum": [
+              "maximize",
+              "minimize"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "kind": {
+            "const": "CREATE_STUDY",
+            "default": "CREATE_STUDY",
+            "title": "Kind",
+            "type": "string"
+          },
+          "max_trials": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/Objective"
+          },
+          "search_space": {
+            "$ref": "#/components/schemas/SearchSpaceSpec"
+          },
+          "seed": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 20261020
+          },
+          "study_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "study_name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "study_id",
+          "study_name",
+          "experiment_id",
+          "max_trials",
+          "search_space",
+          "objective"
+        ],
+        "title": "CreateStudyPayload",
+        "type": "object"
+      },
+      "DimensionKind": {
+        "enum": [
+          "int",
+          "float",
+          "categorical",
+          "bool"
+        ],
+        "title": "DimensionKind",
+        "type": "string"
+      },
+      "EngineCapabilityManifest": {
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "$ref": "#/components/schemas/Backend"
+          },
+          "descriptors": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CapabilityDescriptor"
+            },
+            "title": "Descriptors",
+            "type": "array"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineIdentity"
+          },
+          "help_sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "probed_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "version_output_sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "engine",
+          "backend",
+          "probed_at"
+        ],
+        "title": "EngineCapabilityManifest",
+        "type": "object"
+      },
+      "EngineId": {
+        "enum": [
+          "llamacpp",
+          "strata",
+          "mock_future"
+        ],
+        "title": "EngineId",
+        "type": "string"
+      },
+      "EngineIdentity": {
+        "additionalProperties": false,
+        "properties": {
+          "adapter_schema": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "backend": {
+            "$ref": "#/components/schemas/Backend",
+            "default": "unknown"
+          },
+          "build": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "engine_id": {
+            "$ref": "#/components/schemas/EngineId"
+          },
+          "executable_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "executable_path": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "executable_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "source_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Commit"
+          },
+          "source_digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "engine_id",
+          "version",
+          "build",
+          "executable_id",
+          "executable_sha256"
+        ],
+        "title": "EngineIdentity",
+        "type": "object"
+      },
+      "EventPage": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/JobEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "last_event_id": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "replay_floor": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "events",
+          "last_event_id",
+          "replay_floor"
+        ],
+        "title": "EventPage",
+        "type": "object"
+      },
+      "EventType": {
+        "enum": [
+          "experiment.created",
+          "experiment.state_changed",
+          "experiment.stage_changed",
+          "experiment.completed",
+          "experiment.failed",
+          "command.queued",
+          "command.acknowledged",
+          "command.completed",
+          "command.failed",
+          "worker.registered",
+          "worker.snapshot",
+          "worker.heartbeat",
+          "candidate.proposed",
+          "candidate.claimed",
+          "observation.committed",
+          "observation.reconciled",
+          "optimizer.finalized",
+          "optimizer.offline",
+          "recipe.created",
+          "system.reconciled",
+          "event.gap",
+          "snapshot"
+        ],
+        "title": "EventType",
+        "type": "string"
+      },
+      "EvidenceKind": {
+        "enum": [
+          "native_microbench",
+          "server_api",
+          "quality",
+          "stability",
+          "simulated"
+        ],
+        "title": "EvidenceKind",
+        "type": "string"
+      },
+      "ExperimentListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "experiments": {
+            "items": {
+              "$ref": "#/components/schemas/ExperimentStatusView"
+            },
+            "title": "Experiments",
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "experiments",
+          "total"
+        ],
+        "title": "ExperimentListResponse",
+        "type": "object"
+      },
+      "ExperimentPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "feasibility": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ContextFeasibility"
+            },
+            "title": "Feasibility",
+            "type": "array"
+          },
+          "inventory_snapshot_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "plan_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "required_preflight_command_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ExperimentSpec"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/JobStage",
+            "default": "queued"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "worker_snapshot_revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "plan_id",
+          "status",
+          "spec",
+          "inventory_snapshot_digest"
+        ],
+        "title": "ExperimentPlan",
+        "type": "object"
+      },
+      "ExperimentResultsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "best_candidate_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidates": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CandidateSpec"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "observations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkObservation"
+            },
+            "title": "Observations",
+            "type": "array"
+          },
+          "phase": {
+            "default": "phase-1-screening",
+            "title": "Phase",
+            "type": "string"
+          },
+          "simulated": {
+            "default": false,
+            "title": "Simulated",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExperimentStatusView"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "status"
+        ],
+        "title": "ExperimentResultsResponse",
+        "type": "object"
+      },
+      "ExperimentSpec": {
+        "additionalProperties": false,
+        "description": "Immutable definition of one optimization study.\n\nIt binds explicit engine/model identities, the worker, objective, context\nmatrix, search policy, workload protocol and constraints. It never contains\nmutable process handles or local-only credentials.",
+        "properties": {
+          "constraints": {
+            "$ref": "#/components/schemas/ResourceConstraints"
+          },
+          "contexts": {
+            "items": {
+              "$ref": "#/components/schemas/ContextLength"
+            },
+            "title": "Contexts",
+            "type": "array"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineIdentity"
+          },
+          "gpu_uuids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Gpu Uuids",
+            "type": "array"
+          },
+          "inventory_snapshot_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelArtifact"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/Objective"
+          },
+          "recipe_mode": {
+            "$ref": "#/components/schemas/RecipeMode",
+            "default": "per_context"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "search_depth": {
+            "$ref": "#/components/schemas/SearchDepth"
+          },
+          "search_policy": {
+            "$ref": "#/components/schemas/SearchPolicy"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "workload": {
+            "$ref": "#/components/schemas/WorkloadSuite"
+          }
+        },
+        "required": [
+          "worker_id",
+          "engine",
+          "model",
+          "objective",
+          "contexts",
+          "search_depth",
+          "search_policy",
+          "inventory_snapshot_digest"
+        ],
+        "title": "ExperimentSpec",
+        "type": "object"
+      },
+      "ExperimentStatusView": {
+        "additionalProperties": false,
+        "properties": {
+          "contexts": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Contexts",
+            "type": "array"
+          },
+          "counters": {
+            "$ref": "#/components/schemas/JobCounters"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "engine_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "last_event_id": {
+            "default": 0,
+            "title": "Last Event Id",
+            "type": "integer"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "paused": {
+            "default": false,
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "plan_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "spec_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/JobStage"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JobState"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "state",
+          "stage",
+          "revision",
+          "spec_digest",
+          "plan_digest",
+          "worker_id",
+          "engine_id",
+          "model_id",
+          "objective",
+          "contexts",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ExperimentStatusView",
+        "type": "object"
+      },
+      "ExperimentView": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CandidateSpec"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AwareTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "feasibility": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ContextFeasibility"
+            },
+            "title": "Feasibility",
+            "type": "array"
+          },
+          "observations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkObservation"
+            },
+            "title": "Observations",
+            "type": "array"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/ExperimentPlan"
+          },
+          "simulation": {
+            "default": false,
+            "title": "Simulation",
+            "type": "boolean"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ExperimentSpec"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExperimentStatusView"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "plan",
+          "spec",
+          "created_at"
+        ],
+        "title": "ExperimentView",
+        "type": "object"
+      },
+      "FailureInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/FailureKind"
+          },
+          "message": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "process_exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Exit Code"
+          },
+          "retryable": {
+            "default": false,
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "sanitized_log_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sanitized Log Ref"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/OOMStage",
+            "default": "unknown"
+          }
+        },
+        "required": [
+          "kind",
+          "message"
+        ],
+        "title": "FailureInfo",
+        "type": "object"
+      },
+      "FailureKind": {
+        "enum": [
+          "UNSUPPORTED_FLAG",
+          "UNSUPPORTED_MODEL",
+          "INSUFFICIENT_VRAM",
+          "INSUFFICIENT_RAM",
+          "OOM",
+          "SERVER_NOT_READY",
+          "MODEL_LOAD_FAILURE",
+          "PROCESS_CRASH",
+          "TIMEOUT",
+          "INVALID_METRICS",
+          "CONTEXT_MISMATCH",
+          "QUALITY_REGRESSION",
+          "THERMAL_CONTAMINATION",
+          "EXTERNAL_GPU_CONTENTION",
+          "CANCELLED",
+          "LEASE_CONFLICT",
+          "SIMULATION_ERROR",
+          "UNKNOWN"
+        ],
+        "title": "FailureKind",
+        "type": "string"
+      },
+      "FeasibilityOutcome": {
+        "enum": [
+          "feasible",
+          "resource_infeasible",
+          "unsupported",
+          "inconclusive",
+          "unknown"
+        ],
+        "title": "FeasibilityOutcome",
+        "type": "string"
+      },
+      "GPUDevice": {
+        "additionalProperties": false,
+        "properties": {
+          "compute_capability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Capability"
+          },
+          "driver_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Driver Version"
+          },
+          "index": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "mig_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mig Profile"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "owned_by_lab": {
+            "default": true,
+            "title": "Owned By Lab",
+            "type": "boolean"
+          },
+          "pci_bus_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pci Bus Id"
+          },
+          "uuid": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "vram_total_bytes": {
+            "$ref": "#/components/schemas/PositiveInt"
+          }
+        },
+        "required": [
+          "uuid",
+          "index",
+          "name",
+          "vram_total_bytes"
+        ],
+        "title": "GPUDevice",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HardwareSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "collected_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "contamination_warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Contamination Warnings",
+            "type": "array"
+          },
+          "cpu_model": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "cpu_threads": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "cuda_driver_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuda Driver Version"
+          },
+          "cuda_runtime_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuda Runtime Version"
+          },
+          "gpus": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/GPUDevice"
+            },
+            "title": "Gpus",
+            "type": "array"
+          },
+          "hostname": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "kernel": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "os": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "ram_available_bytes": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "ram_total_bytes": {
+            "$ref": "#/components/schemas/PositiveInt"
+          }
+        },
+        "required": [
+          "hostname",
+          "os",
+          "kernel",
+          "cpu_model",
+          "cpu_threads",
+          "ram_total_bytes",
+          "ram_available_bytes",
+          "collected_at"
+        ],
+        "title": "HardwareSnapshot",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Components",
+            "type": "object"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "HeartbeatRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "active_leases": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Active Leases",
+            "type": "array"
+          },
+          "health": {
+            "$ref": "#/components/schemas/WorkerHealth"
+          },
+          "owned_pids": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Owned Pids",
+            "type": "array"
+          },
+          "snapshot_revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonNegativeInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "health"
+        ],
+        "title": "HeartbeatRequest",
+        "type": "object"
+      },
+      "HeartbeatResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "next_heartbeat_after_ms": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "server_time": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "worker_id",
+          "status",
+          "server_time",
+          "next_heartbeat_after_ms"
+        ],
+        "title": "HeartbeatResponse",
+        "type": "object"
+      },
+      "Identifier": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        "type": "string"
+      },
+      "ImpactClass": {
+        "enum": [
+          "P0",
+          "P1",
+          "P2"
+        ],
+        "title": "ImpactClass",
+        "type": "string"
+      },
+      "JobCounters": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates_completed": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "candidates_failed": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "candidates_infeasible": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "candidates_proposed": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "observations_committed": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "trials_finalized": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "work_units_done": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "work_units_total": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonNegativeInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "JobCounters",
+        "type": "object"
+      },
+      "JobEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "event_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "sequence": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobStage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "$ref": "#/components/schemas/EventType"
+          }
+        },
+        "required": [
+          "event_id",
+          "experiment_id",
+          "sequence",
+          "type",
+          "created_at"
+        ],
+        "title": "JobEvent",
+        "type": "object"
+      },
+      "JobStage": {
+        "enum": [
+          "queued",
+          "preflight",
+          "baseline",
+          "screening",
+          "refinement",
+          "finalist_validation",
+          "report",
+          "completed"
+        ],
+        "title": "JobStage",
+        "type": "string"
+      },
+      "JobState": {
+        "enum": [
+          "queued",
+          "preflight_required",
+          "preflighting",
+          "ready",
+          "running",
+          "paused",
+          "cancelling",
+          "cancelled",
+          "completed",
+          "failed",
+          "blocked"
+        ],
+        "title": "JobState",
+        "type": "string"
+      },
+      "JsonScalar": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "MeasurementStatus": {
+        "enum": [
+          "measured",
+          "estimated",
+          "unavailable",
+          "invalid",
+          "infeasible",
+          "screening_only",
+          "simulated"
+        ],
+        "title": "MeasurementStatus",
+        "type": "string"
+      },
+      "ModelArtifact": {
+        "additionalProperties": false,
+        "properties": {
+          "architecture": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "compatible_engines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EngineId"
+            },
+            "title": "Compatible Engines",
+            "type": "array"
+          },
+          "display_name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "files": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ModelFile"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "metadata_context_tokens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Family"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "parameter_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Count"
+          },
+          "path_map": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Path Map",
+            "type": "array"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantization"
+          },
+          "size_bytes": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "tokenizer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokenizer Id"
+          },
+          "tokenizer_sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verified": {
+            "default": false,
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "model_id",
+          "display_name",
+          "architecture"
+        ],
+        "title": "ModelArtifact",
+        "type": "object"
+      },
+      "ModelFile": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shard_count": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shard_index": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size_bytes": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "verified": {
+            "default": false,
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "ModelFile",
+        "type": "object"
+      },
+      "NonEmptyStr": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "type": "string"
+      },
+      "NonNegativeInt": {
+        "minimum": 0.0,
+        "type": "integer"
+      },
+      "OOMStage": {
+        "enum": [
+          "planning",
+          "model_load",
+          "kv_allocation",
+          "prefill",
+          "decode",
+          "unknown"
+        ],
+        "title": "OOMStage",
+        "type": "string"
+      },
+      "Objective": {
+        "enum": [
+          "balanced",
+          "decode_max",
+          "prefill_max"
+        ],
+        "title": "Objective",
+        "type": "string"
+      },
+      "ObservationStatus": {
+        "enum": [
+          "completed",
+          "resource_infeasible",
+          "unsupported",
+          "failed",
+          "cancelled"
+        ],
+        "title": "ObservationStatus",
+        "type": "string"
+      },
+      "OptimizerCompletion": {
+        "additionalProperties": false,
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "lease_token": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "optimizer_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "ASK_RESULT": "#/components/schemas/AskResult",
+                    "PING_RESULT": "#/components/schemas/PingResult",
+                    "RECONCILE_RESULT": "#/components/schemas/ReconcileResult",
+                    "STUDY_CREATED": "#/components/schemas/StudyCreatedResult",
+                    "TELL_RESULT": "#/components/schemas/TellResult"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/StudyCreatedResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AskResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TellResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReconcileResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PingResult"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          }
+        },
+        "required": [
+          "optimizer_id",
+          "lease_token"
+        ],
+        "title": "OptimizerCompletion",
+        "type": "object"
+      },
+      "OptimizerHealth": {
+        "additionalProperties": false,
+        "properties": {
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AwareTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "online": {
+            "default": false,
+            "title": "Online",
+            "type": "boolean"
+          },
+          "optimizer_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stale_after_seconds": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 30
+          },
+          "status": {
+            "default": "absent",
+            "title": "Status",
+            "type": "string"
+          },
+          "studies_open": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "title": "OptimizerHealth",
+        "type": "object"
+      },
+      "OptimizerHeartbeat": {
+        "additionalProperties": false,
+        "properties": {
+          "last_seen_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "optimizer_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "pid": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "started_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "status": {
+            "default": "ready",
+            "enum": [
+              "starting",
+              "ready",
+              "degraded",
+              "stopping"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "studies_open": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "version": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "optimizer_id",
+          "pid",
+          "started_at",
+          "version"
+        ],
+        "title": "OptimizerHeartbeat",
+        "type": "object"
+      },
+      "OptimizerPollRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "max_requests": {
+            "default": 5,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Requests",
+            "type": "integer"
+          },
+          "optimizer_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "OptimizerPollRequest",
+        "type": "object"
+      },
+      "OptimizerPollResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "leases": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OptimizerRequestLease"
+            },
+            "title": "Leases",
+            "type": "array"
+          },
+          "poll_after_ms": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 1000
+          },
+          "protocol_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1"
+          },
+          "server_time": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          }
+        },
+        "title": "OptimizerPollResponse",
+        "type": "object"
+      },
+      "OptimizerRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "idempotency_key": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/OptimizerRequestKind"
+          },
+          "payload": {
+            "discriminator": {
+              "mapping": {
+                "ASK": "#/components/schemas/AskPayload",
+                "CREATE_STUDY": "#/components/schemas/CreateStudyPayload",
+                "PING": "#/components/schemas/PingPayload",
+                "RECONCILE": "#/components/schemas/ReconcilePayload",
+                "TELL": "#/components/schemas/TellPayload"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CreateStudyPayload"
+              },
+              {
+                "$ref": "#/components/schemas/AskPayload"
+              },
+              {
+                "$ref": "#/components/schemas/TellPayload"
+              },
+              {
+                "$ref": "#/components/schemas/ReconcilePayload"
+              },
+              {
+                "$ref": "#/components/schemas/PingPayload"
+              }
+            ],
+            "title": "Payload"
+          },
+          "protocol_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "study_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "request_id",
+          "kind",
+          "study_id",
+          "payload",
+          "idempotency_key"
+        ],
+        "title": "OptimizerRequest",
+        "type": "object"
+      },
+      "OptimizerRequestAck": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotent_replay": {
+            "default": false,
+            "title": "Idempotent Replay",
+            "type": "boolean"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "status"
+        ],
+        "title": "OptimizerRequestAck",
+        "type": "object"
+      },
+      "OptimizerRequestKind": {
+        "enum": [
+          "CREATE_STUDY",
+          "ASK",
+          "TELL",
+          "RECONCILE",
+          "PING"
+        ],
+        "title": "OptimizerRequestKind",
+        "type": "string"
+      },
+      "OptimizerRequestLease": {
+        "additionalProperties": false,
+        "properties": {
+          "lease_expires_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "lease_token": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "request": {
+            "$ref": "#/components/schemas/OptimizerRequest"
+          }
+        },
+        "required": [
+          "request",
+          "lease_token",
+          "lease_expires_at"
+        ],
+        "title": "OptimizerRequestLease",
+        "type": "object"
+      },
+      "ParameterDimension": {
+        "additionalProperties": false,
+        "properties": {
+          "choices": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JsonScalar"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "conditions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SearchCondition"
+            },
+            "title": "Conditions",
+            "type": "array"
+          },
+          "default": {
+            "$ref": "#/components/schemas/JsonScalar"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "engine_constraints": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Engine Constraints",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DimensionKind"
+          },
+          "log": {
+            "default": false,
+            "title": "Log",
+            "type": "boolean"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "quality_risk": {
+            "default": false,
+            "title": "Quality Risk",
+            "type": "boolean"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "ParameterDimension",
+        "type": "object"
+      },
+      "Parameters": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/JsonScalar"
+        },
+        "type": "object"
+      },
+      "PausePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "PAUSE",
+            "default": "PAUSE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "experiment_id"
+        ],
+        "title": "PausePayload",
+        "type": "object"
+      },
+      "PauseResult": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "command_type": {
+            "const": "PAUSE",
+            "default": "PAUSE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "paused_at_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused At Stage"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "accepted"
+        ],
+        "title": "PauseResult",
+        "type": "object"
+      },
+      "PendingTrial": {
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "trial_number": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "trial_number",
+          "state"
+        ],
+        "title": "PendingTrial",
+        "type": "object"
+      },
+      "PingPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "PING",
+            "default": "PING",
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "PingPayload",
+        "type": "object"
+      },
+      "PingResult": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "PING_RESULT",
+            "default": "PING_RESULT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "optimizer_version": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "optimizer_version"
+        ],
+        "title": "PingResult",
+        "type": "object"
+      },
+      "PlanRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "constraints": {
+            "$ref": "#/components/schemas/ResourceConstraints"
+          },
+          "contexts": {
+            "items": {
+              "$ref": "#/components/schemas/ContextLength"
+            },
+            "title": "Contexts",
+            "type": "array"
+          },
+          "engine_id": {
+            "$ref": "#/components/schemas/EngineId"
+          },
+          "gpu_uuids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Gpu Uuids",
+            "type": "array"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/Objective",
+            "default": "balanced"
+          },
+          "recipe_mode": {
+            "$ref": "#/components/schemas/RecipeMode",
+            "default": "per_context"
+          },
+          "search_depth": {
+            "$ref": "#/components/schemas/SearchDepth",
+            "default": "standard"
+          },
+          "search_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "workload": {
+            "$ref": "#/components/schemas/WorkloadSuite"
+          }
+        },
+        "required": [
+          "worker_id",
+          "engine_id",
+          "model_id",
+          "contexts"
+        ],
+        "title": "PlanRequest",
+        "type": "object"
+      },
+      "PlanResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExperimentPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "retry_after_ms": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonNegativeInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlanStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PlanResponse",
+        "type": "object"
+      },
+      "PlanStatus": {
+        "enum": [
+          "ready",
+          "preflight_required"
+        ],
+        "title": "PlanStatus",
+        "type": "string"
+      },
+      "PollRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "max_commands": {
+            "default": 5,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Commands",
+            "type": "integer"
+          }
+        },
+        "title": "PollRequest",
+        "type": "object"
+      },
+      "PositiveInt": {
+        "exclusiveMinimum": 0.0,
+        "type": "integer"
+      },
+      "PreflightPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "PREFLIGHT",
+            "default": "PREFLIGHT",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "contexts": {
+            "items": {
+              "$ref": "#/components/schemas/ContextLength"
+            },
+            "title": "Contexts",
+            "type": "array"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/EngineIdentity"
+          },
+          "expected_snapshot_revision": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "full_context_check": {
+            "default": true,
+            "title": "Full Context Check",
+            "type": "boolean"
+          },
+          "gpu_uuids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Gpu Uuids",
+            "type": "array"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelArtifact"
+          },
+          "plan_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "spec_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "spec_digest",
+          "plan_digest",
+          "engine",
+          "model",
+          "contexts",
+          "expected_snapshot_revision"
+        ],
+        "title": "PreflightPayload",
+        "type": "object"
+      },
+      "PreflightResult": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "PREFLIGHT",
+            "default": "PREFLIGHT",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "engine_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "failure_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "feasibility": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ContextFeasibility"
+            },
+            "title": "Feasibility",
+            "type": "array"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "model_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkerSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot_revision": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "passed",
+          "engine_sha256",
+          "model_digest",
+          "snapshot_revision"
+        ],
+        "title": "PreflightResult",
+        "type": "object"
+      },
+      "Probability": {
+        "maximum": 1.0,
+        "minimum": 0.0,
+        "type": "number"
+      },
+      "PromotePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "PROMOTE",
+            "default": "PROMOTE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "dry_run": {
+            "default": true,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "previous_recipe_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recipe_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "recipe_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "target_slot": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "recipe_id",
+          "recipe_digest",
+          "target_slot"
+        ],
+        "title": "PromotePayload",
+        "type": "object"
+      },
+      "PromoteResult": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "PROMOTE",
+            "default": "PROMOTE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "promoted": {
+            "title": "Promoted",
+            "type": "boolean"
+          },
+          "recipe_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "slot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot"
+          }
+        },
+        "required": [
+          "recipe_id",
+          "promoted",
+          "dry_run"
+        ],
+        "title": "PromoteResult",
+        "type": "object"
+      },
+      "PromotionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "dry_run": {
+            "default": true,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "target_slot": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "target_slot"
+        ],
+        "title": "PromotionRequest",
+        "type": "object"
+      },
+      "QualityGate": {
+        "additionalProperties": false,
+        "properties": {
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "$ref": "#/components/schemas/QualityGateStatus"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "QualityGate",
+        "type": "object"
+      },
+      "QualityGateStatus": {
+        "enum": [
+          "passed",
+          "failed",
+          "not_run",
+          "inconclusive"
+        ],
+        "title": "QualityGateStatus",
+        "type": "string"
+      },
+      "RawEvidenceRef": {
+        "additionalProperties": false,
+        "properties": {
+          "content_type": {
+            "default": "application/octet-stream",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "path": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "size_bytes": {
+            "default": 0,
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "title": "RawEvidenceRef",
+        "type": "object"
+      },
+      "RecipeCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "candidate_id"
+        ],
+        "title": "RecipeCreateRequest",
+        "type": "object"
+      },
+      "RecipeListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "recipes": {
+            "items": {
+              "$ref": "#/components/schemas/RecipeView"
+            },
+            "title": "Recipes",
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "recipes",
+          "total"
+        ],
+        "title": "RecipeListResponse",
+        "type": "object"
+      },
+      "RecipeMode": {
+        "enum": [
+          "per_context",
+          "cross_context"
+        ],
+        "title": "RecipeMode",
+        "type": "string"
+      },
+      "RecipeView": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "recipe": {
+            "additionalProperties": true,
+            "title": "Recipe",
+            "type": "object"
+          },
+          "recipe_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "recipe_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipe_id",
+          "experiment_id",
+          "candidate_id",
+          "status",
+          "recipe_digest",
+          "recipe",
+          "created_at"
+        ],
+        "title": "RecipeView",
+        "type": "object"
+      },
+      "ReconcilePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "RECONCILE",
+            "default": "RECONCILE",
+            "title": "Kind",
+            "type": "string"
+          },
+          "study_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "study_name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "study_id",
+          "study_name"
+        ],
+        "title": "ReconcilePayload",
+        "type": "object"
+      },
+      "ReconcileResult": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_trials": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "failed_trials": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "kind": {
+            "const": "RECONCILE_RESULT",
+            "default": "RECONCILE_RESULT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "pending_trials": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PendingTrial"
+            },
+            "title": "Pending Trials",
+            "type": "array"
+          },
+          "study_name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "total_trials": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "study_name",
+          "total_trials",
+          "completed_trials",
+          "failed_trials"
+        ],
+        "title": "ReconcileResult",
+        "type": "object"
+      },
+      "ResourceConstraints": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_quality_changing_flags": {
+            "default": false,
+            "title": "Allow Quality Changing Flags",
+            "type": "boolean"
+          },
+          "max_system_ram_bytes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_temperature_c": {
+            "anyOf": [
+              {
+                "maximum": 150.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Temperature C"
+          },
+          "max_ttft_p95_ms": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Ttft P95 Ms"
+          },
+          "max_vram_bytes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "min_free_ram_bytes": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 2000000000
+          },
+          "min_free_vram_bytes": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 1500000000
+          },
+          "min_quality_score": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Probability"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quiet_gpu_required": {
+            "default": true,
+            "title": "Quiet Gpu Required",
+            "type": "boolean"
+          },
+          "require_full_context_proof": {
+            "default": true,
+            "title": "Require Full Context Proof",
+            "type": "boolean"
+          }
+        },
+        "title": "ResourceConstraints",
+        "type": "object"
+      },
+      "ScanPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "SCAN",
+            "default": "SCAN",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "hash_models": {
+            "default": false,
+            "title": "Hash Models",
+            "type": "boolean"
+          },
+          "include_engines": {
+            "default": true,
+            "title": "Include Engines",
+            "type": "boolean"
+          },
+          "include_hardware": {
+            "default": true,
+            "title": "Include Hardware",
+            "type": "boolean"
+          },
+          "include_models": {
+            "default": true,
+            "title": "Include Models",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "roots": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roots"
+        ],
+        "title": "ScanPayload",
+        "type": "object"
+      },
+      "ScanResult": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "SCAN",
+            "default": "SCAN",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/WorkerSnapshot"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "title": "ScanResult",
+        "type": "object"
+      },
+      "SearchCondition": {
+        "additionalProperties": false,
+        "properties": {
+          "operator": {
+            "$ref": "#/components/schemas/ConditionOperator"
+          },
+          "parameter": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/JsonScalar"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "parameter",
+          "operator",
+          "values"
+        ],
+        "title": "SearchCondition",
+        "type": "object"
+      },
+      "SearchDepth": {
+        "enum": [
+          "quick",
+          "standard",
+          "thorough"
+        ],
+        "title": "SearchDepth",
+        "type": "string"
+      },
+      "SearchPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "budget_gpu_hours": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Gpu Hours"
+          },
+          "budget_wall_clock_seconds": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence_level": {
+            "$ref": "#/components/schemas/Probability",
+            "default": 0.95
+          },
+          "depth": {
+            "$ref": "#/components/schemas/SearchDepth",
+            "default": "standard"
+          },
+          "final_replications": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finalist_count": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_candidates": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_proposal_attempts": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 4
+          },
+          "min_improvement_pct": {
+            "default": 5.0,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Improvement Pct",
+            "type": "number"
+          },
+          "screening_contexts": {
+            "default": [
+              4096,
+              32768
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ContextLength"
+            },
+            "title": "Screening Contexts",
+            "type": "array"
+          },
+          "screening_replications": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seed": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 20261020
+          }
+        },
+        "title": "SearchPolicy",
+        "type": "object"
+      },
+      "SearchSpaceSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "constraints": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Constraints",
+            "type": "array"
+          },
+          "dimensions": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterDimension"
+            },
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "engine_id": {
+            "$ref": "#/components/schemas/EngineId"
+          },
+          "fixed_parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonScalar"
+            },
+            "title": "Fixed Parameters",
+            "type": "object"
+          },
+          "max_proposals": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 256
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          }
+        },
+        "required": [
+          "engine_id",
+          "dimensions"
+        ],
+        "title": "SearchSpaceSpec",
+        "type": "object"
+      },
+      "Sha256": {
+        "maxLength": 64,
+        "minLength": 64,
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "StudyCreatedResult": {
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "STUDY_CREATED",
+            "default": "STUDY_CREATED",
+            "title": "Kind",
+            "type": "string"
+          },
+          "study_name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "trial_count": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          }
+        },
+        "required": [
+          "study_name",
+          "created"
+        ],
+        "title": "StudyCreatedResult",
+        "type": "object"
+      },
+      "SupportLevel": {
+        "enum": [
+          "supported",
+          "unsupported",
+          "unknown",
+          "conditional"
+        ],
+        "title": "SupportLevel",
+        "type": "string"
+      },
+      "SystemStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_simulation": {
+            "title": "Allow Simulation",
+            "type": "boolean"
+          },
+          "api_version": {
+            "title": "Api Version",
+            "type": "string"
+          },
+          "controller_db": {
+            "title": "Controller Db",
+            "type": "string"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "experiments_active": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "optimizer": {
+            "$ref": "#/components/schemas/OptimizerHealth"
+          },
+          "optimizer_db": {
+            "title": "Optimizer Db",
+            "type": "string"
+          },
+          "scheduler_running": {
+            "title": "Scheduler Running",
+            "type": "boolean"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "workers_online": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "service",
+          "version",
+          "environment",
+          "api_version",
+          "controller_db",
+          "optimizer_db",
+          "optimizer",
+          "workers_online",
+          "experiments_active",
+          "scheduler_running",
+          "allow_simulation"
+        ],
+        "title": "SystemStatusResponse",
+        "type": "object"
+      },
+      "TelemetryCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/Probability",
+            "default": 0.0
+          },
+          "expected_samples": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonNegativeInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "sample_interval_ms": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositiveInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "samples": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "source": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "none"
+          }
+        },
+        "title": "TelemetryCoverage",
+        "type": "object"
+      },
+      "TellPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "feasibility": {
+            "$ref": "#/components/schemas/FeasibilityOutcome",
+            "default": "unknown"
+          },
+          "kind": {
+            "const": "TELL",
+            "default": "TELL",
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TrialTellState"
+          },
+          "study_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "study_name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "trial_number": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "study_id",
+          "study_name",
+          "candidate_id",
+          "trial_number",
+          "state"
+        ],
+        "title": "TellPayload",
+        "type": "object"
+      },
+      "TellResult": {
+        "additionalProperties": false,
+        "properties": {
+          "already_finalized": {
+            "default": false,
+            "title": "Already Finalized",
+            "type": "boolean"
+          },
+          "finalized": {
+            "title": "Finalized",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "TELL_RESULT",
+            "default": "TELL_RESULT",
+            "title": "Kind",
+            "type": "string"
+          },
+          "study_name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "trial_number": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "trial_state": {
+            "title": "Trial State",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "study_name",
+          "trial_number",
+          "trial_state",
+          "finalized"
+        ],
+        "title": "TellResult",
+        "type": "object"
+      },
+      "TrialResult": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "CLAIM_TRIAL",
+            "default": "CLAIM_TRIAL",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "observation": {
+            "$ref": "#/components/schemas/BenchmarkObservation"
+          }
+        },
+        "required": [
+          "observation"
+        ],
+        "title": "TrialResult",
+        "type": "object"
+      },
+      "TrialTellState": {
+        "enum": [
+          "complete",
+          "fail",
+          "pruned"
+        ],
+        "title": "TrialTellState",
+        "type": "string"
+      },
+      "UnitFraction": {
+        "exclusiveMinimum": 0.0,
+        "maximum": 1.0,
+        "type": "number"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VerifyRecipePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "VERIFY_RECIPE",
+            "default": "VERIFY_RECIPE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "expected_engine_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "expected_model_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "recipe_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "recipe_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "recipe_id",
+          "recipe_digest",
+          "expected_engine_sha256",
+          "expected_model_digest"
+        ],
+        "title": "VerifyRecipePayload",
+        "type": "object"
+      },
+      "VerifyRecipeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "VERIFY_RECIPE",
+            "default": "VERIFY_RECIPE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "engine_sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "mismatches": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Mismatches",
+            "type": "array"
+          },
+          "model_digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recipe_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "recipe_id",
+          "verified"
+        ],
+        "title": "VerifyRecipeResult",
+        "type": "object"
+      },
+      "WorkerCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "command_type": {
+            "$ref": "#/components/schemas/CommandType"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "expected_snapshot_revision": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "idempotency_key": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "payload": {
+            "discriminator": {
+              "mapping": {
+                "CANCEL": "#/components/schemas/CancelPayload",
+                "CLAIM_TRIAL": "#/components/schemas/ClaimTrialPayload",
+                "PAUSE": "#/components/schemas/PausePayload",
+                "PREFLIGHT": "#/components/schemas/PreflightPayload",
+                "PROMOTE": "#/components/schemas/PromotePayload",
+                "SCAN": "#/components/schemas/ScanPayload",
+                "VERIFY_RECIPE": "#/components/schemas/VerifyRecipePayload"
+              },
+              "propertyName": "command_type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ScanPayload"
+              },
+              {
+                "$ref": "#/components/schemas/PreflightPayload"
+              },
+              {
+                "$ref": "#/components/schemas/ClaimTrialPayload"
+              },
+              {
+                "$ref": "#/components/schemas/PausePayload"
+              },
+              {
+                "$ref": "#/components/schemas/CancelPayload"
+              },
+              {
+                "$ref": "#/components/schemas/VerifyRecipePayload"
+              },
+              {
+                "$ref": "#/components/schemas/PromotePayload"
+              }
+            ],
+            "title": "Payload"
+          },
+          "protocol_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "command_id",
+          "command_type",
+          "worker_id",
+          "payload",
+          "idempotency_key"
+        ],
+        "title": "WorkerCommand",
+        "type": "object"
+      },
+      "WorkerCommandLease": {
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/WorkerCommand"
+          },
+          "lease_expires_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "lease_generation": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "lease_token": {
+            "title": "Lease Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command",
+          "lease_token",
+          "lease_generation",
+          "lease_expires_at"
+        ],
+        "title": "WorkerCommandLease",
+        "type": "object"
+      },
+      "WorkerHealth": {
+        "additionalProperties": false,
+        "properties": {
+          "active_leases": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Active Leases",
+            "type": "array"
+          },
+          "isolated": {
+            "default": true,
+            "title": "Isolated",
+            "type": "boolean"
+          },
+          "last_heartbeat_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "owned_pids": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Owned Pids",
+            "type": "array"
+          },
+          "status": {
+            "default": "online",
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "last_heartbeat_at"
+        ],
+        "title": "WorkerHealth",
+        "type": "object"
+      },
+      "WorkerIdentity": {
+        "additionalProperties": false,
+        "properties": {
+          "enrolled_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "protocol_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1"
+          },
+          "roles": {
+            "default": [
+              "benchmark"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "version": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "worker_id",
+          "name",
+          "version",
+          "platform",
+          "enrolled_at"
+        ],
+        "title": "WorkerIdentity",
+        "type": "object"
+      },
+      "WorkerListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "total": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerView"
+            },
+            "title": "Workers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "workers",
+          "total"
+        ],
+        "title": "WorkerListResponse",
+        "type": "object"
+      },
+      "WorkerPollResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "leases": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WorkerCommandLease"
+            },
+            "title": "Leases",
+            "type": "array"
+          },
+          "poll_after_ms": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 1000
+          },
+          "protocol_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1"
+          },
+          "server_time": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          }
+        },
+        "title": "WorkerPollResponse",
+        "type": "object"
+      },
+      "WorkerRegistrationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "hardware": {
+            "$ref": "#/components/schemas/HardwareSnapshot"
+          },
+          "worker": {
+            "$ref": "#/components/schemas/WorkerIdentity"
+          }
+        },
+        "required": [
+          "worker",
+          "hardware"
+        ],
+        "title": "WorkerRegistrationRequest",
+        "type": "object"
+      },
+      "WorkerRegistrationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "snapshot_revision": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "token": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "token_prefix": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "worker": {
+            "$ref": "#/components/schemas/WorkerIdentity"
+          }
+        },
+        "required": [
+          "worker",
+          "token",
+          "token_prefix",
+          "snapshot_revision"
+        ],
+        "title": "WorkerRegistrationResponse",
+        "type": "object"
+      },
+      "WorkerSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "discovery_digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "engines": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EngineCapabilityManifest"
+            },
+            "title": "Engines",
+            "type": "array"
+          },
+          "hardware": {
+            "$ref": "#/components/schemas/HardwareSnapshot"
+          },
+          "health": {
+            "$ref": "#/components/schemas/WorkerHealth"
+          },
+          "models": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ModelArtifact"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "snapshot_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "worker_id",
+          "revision",
+          "created_at",
+          "hardware",
+          "health"
+        ],
+        "title": "WorkerSnapshot",
+        "type": "object"
+      },
+      "WorkerSnapshotRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "snapshot": {
+            "$ref": "#/components/schemas/WorkerSnapshot"
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "title": "WorkerSnapshotRequest",
+        "type": "object"
+      },
+      "WorkerSnapshotResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "discovery_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "snapshot_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accepted",
+          "snapshot_id",
+          "revision",
+          "discovery_digest"
+        ],
+        "title": "WorkerSnapshotResponse",
+        "type": "object"
+      },
+      "WorkerView": {
+        "additionalProperties": false,
+        "properties": {
+          "gpus": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Gpus",
+            "type": "array"
+          },
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AwareTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "protocol_version": {
+            "title": "Protocol Version",
+            "type": "string"
+          },
+          "snapshot_created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AwareTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot_revision": {
+            "title": "Snapshot Revision",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "worker_id",
+          "name",
+          "status",
+          "protocol_version",
+          "last_heartbeat_at",
+          "snapshot_revision",
+          "snapshot_created_at"
+        ],
+        "title": "WorkerView",
+        "type": "object"
+      },
+      "WorkloadSuite": {
+        "additionalProperties": false,
+        "properties": {
+          "dataset_id": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "lab-synthetic-v1"
+          },
+          "dataset_sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deterministic_sampling": {
+            "default": true,
+            "title": "Deterministic Sampling",
+            "type": "boolean"
+          },
+          "extended_output_tokens": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 1024
+          },
+          "output_tokens": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 256
+          },
+          "prompt_levels": {
+            "default": [
+              0.25,
+              0.6,
+              0.85,
+              0.98
+            ],
+            "items": {
+              "$ref": "#/components/schemas/UnitFraction"
+            },
+            "title": "Prompt Levels",
+            "type": "array"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "LAB-BENCH-v1"
+          },
+          "repetitions": {
+            "$ref": "#/components/schemas/PositiveInt",
+            "default": 3
+          },
+          "seed": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 42
+          },
+          "temperature": {
+            "default": 0.0,
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "top_p": {
+            "$ref": "#/components/schemas/UnitFraction",
+            "default": 1.0
+          }
+        },
+        "title": "WorkloadSuite",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Local-first AI inference optimization controller (Phase 1 foundation).",
+    "title": "AI Inference Optimization Lab",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/experiments": {
+      "get": {
+        "operationId": "list_all_api_v1_experiments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List All",
+        "tags": [
+          "experiments"
+        ]
+      },
+      "post": {
+        "operationId": "create_api_v1_experiments_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExperimentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/plan": {
+      "post": {
+        "operationId": "plan_experiment_api_v1_experiments_plan_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Experiment",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}": {
+      "get": {
+        "operationId": "get_one_api_v1_experiments__experiment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get One",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}/cancel": {
+      "post": {
+        "operationId": "cancel_api_v1_experiments__experiment_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}/commands": {
+      "get": {
+        "operationId": "commands_api_v1_experiments__experiment_id__commands_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Commands Api V1 Experiments  Experiment Id  Commands Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commands",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}/events": {
+      "get": {
+        "operationId": "events_api_v1_experiments__experiment_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "last_event_id",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Last Event Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Last-Event-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Events",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}/events/page": {
+      "get": {
+        "operationId": "events_page_api_v1_experiments__experiment_id__events_page_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 2000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Events Page",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}/pause": {
+      "post": {
+        "operationId": "pause_api_v1_experiments__experiment_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}/preflight/retry": {
+      "post": {
+        "operationId": "retry_api_v1_experiments__experiment_id__preflight_retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}/results": {
+      "get": {
+        "operationId": "results_api_v1_experiments__experiment_id__results_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentResultsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Results",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/experiments/{experiment_id}/resume": {
+      "post": {
+        "operationId": "resume_api_v1_experiments__experiment_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "experiment_id",
+            "required": true,
+            "schema": {
+              "title": "Experiment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume",
+        "tags": [
+          "experiments"
+        ]
+      }
+    },
+    "/api/v1/internal/optimizer/health": {
+      "get": {
+        "operationId": "health_api_v1_internal_optimizer_health_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizerHealth"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "optimizer-internal"
+        ]
+      }
+    },
+    "/api/v1/internal/optimizer/heartbeat": {
+      "post": {
+        "operationId": "heartbeat_api_v1_internal_optimizer_heartbeat_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizerHeartbeat"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Heartbeat Api V1 Internal Optimizer Heartbeat Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Heartbeat",
+        "tags": [
+          "optimizer-internal"
+        ]
+      }
+    },
+    "/api/v1/internal/optimizer/requests/poll": {
+      "post": {
+        "operationId": "poll_api_v1_internal_optimizer_requests_poll_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizerPollRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizerPollResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Poll",
+        "tags": [
+          "optimizer-internal"
+        ]
+      }
+    },
+    "/api/v1/internal/optimizer/requests/{request_id}/complete": {
+      "post": {
+        "operationId": "complete_api_v1_internal_optimizer_requests__request_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizerCompletion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizerRequestAck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete",
+        "tags": [
+          "optimizer-internal"
+        ]
+      }
+    },
+    "/api/v1/recipes": {
+      "get": {
+        "operationId": "list_all_api_v1_recipes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "experiment_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Experiment Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List All",
+        "tags": [
+          "recipes"
+        ]
+      },
+      "post": {
+        "operationId": "create_api_v1_recipes_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecipeCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "recipes"
+        ]
+      }
+    },
+    "/api/v1/recipes/{recipe_id}": {
+      "get": {
+        "operationId": "get_one_api_v1_recipes__recipe_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recipe_id",
+            "required": true,
+            "schema": {
+              "title": "Recipe Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get One",
+        "tags": [
+          "recipes"
+        ]
+      }
+    },
+    "/api/v1/recipes/{recipe_id}/promote": {
+      "post": {
+        "operationId": "promote_api_v1_recipes__recipe_id__promote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recipe_id",
+            "required": true,
+            "schema": {
+              "title": "Recipe Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromotionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Promote Api V1 Recipes  Recipe Id  Promote Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Promote",
+        "tags": [
+          "recipes"
+        ]
+      }
+    },
+    "/api/v1/recipes/{recipe_id}/verify": {
+      "post": {
+        "operationId": "verify_api_v1_recipes__recipe_id__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recipe_id",
+            "required": true,
+            "schema": {
+              "title": "Recipe Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Verify Api V1 Recipes  Recipe Id  Verify Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify",
+        "tags": [
+          "recipes"
+        ]
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "operationId": "status_api_v1_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Status",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/workers": {
+      "get": {
+        "operationId": "list_workers_api_v1_workers_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Workers",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/register": {
+      "post": {
+        "operationId": "register_api_v1_workers_register_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Enrollment-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Enrollment-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerRegistrationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}": {
+      "get": {
+        "operationId": "get_worker_api_v1_workers__worker_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Worker",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}/commands": {
+      "get": {
+        "operationId": "list_worker_commands_api_v1_workers__worker_id__commands_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Worker Commands Api V1 Workers  Worker Id  Commands Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Worker Commands",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}/commands/poll": {
+      "post": {
+        "operationId": "poll_api_v1_workers__worker_id__commands_poll_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PollRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerPollResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Poll",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}/commands/{command_id}/ack": {
+      "post": {
+        "operationId": "ack_api_v1_workers__worker_id__commands__command_id__ack_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "title": "Command Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandAck"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ack",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}/commands/{command_id}/complete": {
+      "post": {
+        "operationId": "complete_api_v1_workers__worker_id__commands__command_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "title": "Command Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandCompletion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}/heartbeat": {
+      "post": {
+        "operationId": "worker_heartbeat_api_v1_workers__worker_id__heartbeat_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartbeatResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Worker Heartbeat",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}/snapshot": {
+      "post": {
+        "operationId": "upload_snapshot_api_v1_workers__worker_id__snapshot_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerSnapshotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerSnapshotResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Snapshot",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/ready": {
+      "get": {
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "system"
+        ]
+      }
+    }
+  }
+}

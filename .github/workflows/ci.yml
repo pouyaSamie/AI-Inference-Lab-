@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python-and-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Python workspace
+        run: uv sync --all-packages --frozen
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Format check
+        run: uv run ruff format --check
+
+      - name: Type check Python
+        run: uv run mypy python
+
+      - name: Tests (no GPU or live engine)
+        run: uv run pytest -q
+
+      - name: Generated contract drift
+        run: uv run python scripts/check_contracts.py
+
+      - name: Install Node workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check generated TypeScript contracts
+        run: pnpm typecheck

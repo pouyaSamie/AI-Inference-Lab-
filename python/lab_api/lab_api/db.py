@@ -17,7 +17,8 @@ from .config import Settings
 def _is_memory_sqlite(url: str) -> bool:
     parsed = make_url(url)
     return parsed.get_backend_name() == "sqlite" and (
-        parsed.database in (None, "", ":memory:") or "mode=memory" in (parsed.query.get("uri", [""])[0] if parsed.query else "")
+        parsed.database in (None, "", ":memory:")
+        or "mode=memory" in (parsed.query.get("uri", [""])[0] if parsed.query else "")
     )
 
 

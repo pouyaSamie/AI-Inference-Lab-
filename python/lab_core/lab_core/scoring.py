@@ -12,9 +12,9 @@ import random
 import statistics
 from collections.abc import Sequence
 
-from pydantic import Field, model_validator
+from pydantic import model_validator
 
-from .base import FrozenModel, NonEmptyStr, Probability, UnitFraction
+from .base import FrozenModel, NonEmptyStr, Probability
 from .enums import Objective
 
 

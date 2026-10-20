@@ -17,10 +17,9 @@ from dataclasses import dataclass
 from typing import Literal
 
 from fastapi import Depends, Header, Request
+from lab_core.errors import AuthenticationError, AuthorizationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-from lab_core.errors import AuthenticationError, AuthorizationError
 
 from .config import Settings
 from .dependencies import get_session, get_settings
@@ -38,7 +37,7 @@ class Principal:
 
 
 def hash_worker_token(pepper: str, token: str) -> str:
-    return hashlib.sha256(f"{pepper}:{token}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{pepper}:{token}".encode()).hexdigest()
 
 
 def new_worker_token() -> str:
@@ -88,7 +87,9 @@ def authenticate(
     expected = hash_worker_token(settings.worker_token_pepper.get_secret_value(), token)
     for row in rows:
         if hmac.compare_digest(row.token_sha256, expected):
-            principal = Principal(kind="worker", role="worker", subject=row.worker_id, worker_id=row.worker_id)
+            principal = Principal(
+                kind="worker", role="worker", subject=row.worker_id, worker_id=row.worker_id
+            )
             request.state.principal = principal
             return principal
     raise AuthenticationError("credential is not valid for this controller")
@@ -97,6 +98,20 @@ def authenticate(
 def require_operator(principal: Principal = Depends(authenticate)) -> Principal:
     if principal.kind != "operator":
         raise AuthorizationError("operator credential required")
+    return principal
+
+
+def require_operator_stateless(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+) -> Principal:
+    """Operator check for long-lived SSE streams; never holds a DB session."""
+    token = _extract_bearer(authorization)
+    if not _match(settings.operator_token.get_secret_value(), token):
+        raise AuthorizationError("operator credential required")
+    principal = Principal(kind="operator", role="admin", subject="operator")
+    request.state.principal = principal
     return principal
 
 

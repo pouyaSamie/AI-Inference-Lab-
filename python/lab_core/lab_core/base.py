@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Any, TypeAlias
+from typing import Annotated, Any
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints
 
@@ -31,22 +31,23 @@ class FrozenModel(BaseModel):
         return sha256_hex(self.canonical_payload(exclude=exclude))
 
 
-NonEmptyStr: TypeAlias = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4096)
+type NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4096)]
+type Identifier = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+    ),
 ]
-Identifier: TypeAlias = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
-]
-Sha256: TypeAlias = Annotated[
+type Sha256 = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
 ]
-JsonScalar: TypeAlias = str | int | float | bool | None
-Parameters: TypeAlias = dict[str, JsonScalar]
-AwareTimestamp: TypeAlias = AwareDatetime
-PositiveInt: TypeAlias = Annotated[int, Field(gt=0)]
-NonNegativeInt: TypeAlias = Annotated[int, Field(ge=0)]
-Probability: TypeAlias = Annotated[float, Field(ge=0.0, le=1.0)]
-UnitFraction: TypeAlias = Annotated[float, Field(gt=0.0, le=1.0)]
+type JsonScalar = str | int | float | bool | None
+type Parameters = dict[str, JsonScalar]
+type AwareTimestamp = AwareDatetime
+type PositiveInt = Annotated[int, Field(gt=0)]
+type NonNegativeInt = Annotated[int, Field(ge=0)]
+type Probability = Annotated[float, Field(ge=0.0, le=1.0)]
+type UnitFraction = Annotated[float, Field(gt=0.0, le=1.0)]
 
 
 def utcnow() -> datetime:

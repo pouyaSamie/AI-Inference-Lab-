@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from typing import ClassVar, Protocol, runtime_checkable
 
+from lab_core.adapter_io import AdapterDescriptor
+
 from lab_core import (
-    BenchmarkObservation,
     CandidateSpec,
     CommandSpec,
     CompatibilityResult,
@@ -32,7 +33,6 @@ from lab_core import (
     ServerExecutionPlan,
     ServingObservation,
 )
-from lab_core.adapter_io import AdapterDescriptor
 
 from .results import ValidatedEvidence
 
@@ -52,9 +52,7 @@ class InferenceAdapter(Protocol):
         self, outputs: tuple[ProcessOutput, ...], binary: RegisteredBinary
     ) -> EngineCapabilityManifest: ...
 
-    def inspect_model(
-        self, artifact: ModelArtifact, engine: EngineCapabilityManifest
-    ) -> ModelMetadata: ...
+    def inspect_model(self, artifact: ModelArtifact, engine: EngineCapabilityManifest) -> ModelMetadata: ...
 
     def check_compatibility(
         self,
@@ -65,7 +63,9 @@ class InferenceAdapter(Protocol):
 
     def search_space(self, request: SearchSpaceRequest) -> SearchSpaceSpec: ...
 
-    def validate_candidate(self, candidate: CandidateSpec, engine: EngineCapabilityManifest) -> tuple[str, ...]:
+    def validate_candidate(
+        self, candidate: CandidateSpec, engine: EngineCapabilityManifest
+    ) -> tuple[str, ...]:
         """Return human-readable incompatibilities; never silently drop a flag."""
         ...
 
@@ -89,7 +89,9 @@ class InferenceAdapter(Protocol):
         port: int,
     ) -> ServerExecutionPlan: ...
 
-    def parse_microbench_evidence(self, evidence: RawEvidence, candidate: CandidateSpec) -> MicrobenchObservation: ...
+    def parse_microbench_evidence(
+        self, evidence: RawEvidence, candidate: CandidateSpec
+    ) -> MicrobenchObservation: ...
 
     def parse_server_evidence(
         self, status: RawEvidence, metrics: RawEvidence | None, candidate: CandidateSpec

@@ -6,7 +6,18 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from .base import AwareTimestamp, FrozenModel, Identifier, JsonScalar, NonEmptyStr, NonNegativeInt, Parameters, PositiveInt, Sha256, utcnow
+from .base import (
+    AwareTimestamp,
+    FrozenModel,
+    Identifier,
+    JsonScalar,
+    NonEmptyStr,
+    NonNegativeInt,
+    Parameters,
+    PositiveInt,
+    Sha256,
+    utcnow,
+)
 from .engine import EngineIdentity
 from .enums import AckDisposition, CommandStatus, CommandType, ContextLength, FailureKind
 from .experiment import ContextFeasibility

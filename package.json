@@ -1,0 +1,10 @@
+{
+  "name": "ai-inference-optimization-lab",
+  "private": true,
+  "packageManager": "pnpm@10.18.3",
+  "scripts": {
+    "typecheck": "pnpm --filter @lab/client-contracts typecheck",
+    "generate:contracts": "uv run python scripts/export_openapi.py && uv run python scripts/export_schemas.py && uv run python scripts/export_ts.py",
+    "contracts:check": "uv run python scripts/check_contracts.py"
+  }
+}

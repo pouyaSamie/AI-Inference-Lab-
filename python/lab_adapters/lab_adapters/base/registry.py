@@ -34,7 +34,9 @@ class AdapterRegistry:
         return tuple(self._adapters.values())
 
     def production(self) -> tuple[InferenceAdapter, ...]:
-        return tuple(adapter for adapter in self._adapters.values() if adapter.adapter_id is not EngineId.MOCK_FUTURE)
+        return tuple(
+            adapter for adapter in self._adapters.values() if adapter.adapter_id is not EngineId.MOCK_FUTURE
+        )
 
 
 _default_registry: AdapterRegistry | None = None

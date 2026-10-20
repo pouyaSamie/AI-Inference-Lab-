@@ -16,10 +16,15 @@ from __future__ import annotations
 
 import json
 import re
-from typing import ClassVar
+from collections.abc import Mapping
+from typing import Any, ClassVar
+
+from lab_core.adapter_io import AdapterDescriptor
+from lab_core.ids import sha256_text
+from lab_core.search import DimensionKind, ParameterDimension
+from lab_core.version import ADAPTER_SDK_VERSION
 
 from lab_core import (
-    Backend,
     CandidateSpec,
     CapabilityKind,
     CapabilityProvenance,
@@ -56,22 +61,25 @@ from lab_core import (
     ServingObservation,
     SupportLevel,
     UnsupportedCapabilityError,
-    utcnow,
     stable_id,
+    utcnow,
 )
-from lab_core.adapter_io import AdapterDescriptor
-from lab_core.ids import sha256_text
-from lab_core.search import DimensionKind, ParameterDimension
-from lab_core.version import ADAPTER_SDK_VERSION
 
-from ..base.parsing import descriptor, observed_flags, parse_json_document, probe_command, require_flags, server_readiness
-from ..base.results import ValidatedEvidence
+from ..base.parsing import (
+    descriptor,
+    observed_flags,
+    parse_json_document,
+    probe_command,
+    require_flags,
+    server_readiness,
+)
 from ..base.protocol import InferenceAdapter
+from ..base.results import ValidatedEvidence
 
 _VERSION_RE = re.compile(r"^strata\s+(?P<version>\S+)\s*$", re.MULTILINE)
 
 
-def _int(parameters: dict[str, object], key: str, default: int) -> int:
+def _int(parameters: Mapping[str, object], key: str, default: int) -> int:
     value = parameters.get(key)
     if value is None:
         return default
@@ -80,7 +88,7 @@ def _int(parameters: dict[str, object], key: str, default: int) -> int:
     return value
 
 
-def _bool(parameters: dict[str, object], key: str, default: bool) -> bool:
+def _bool(parameters: Mapping[str, object], key: str, default: bool) -> bool:
     value = parameters.get(key)
     if value is None:
         return default
@@ -131,7 +139,7 @@ class StrataAdapter(InferenceAdapter):
             executable_id=binary.executable_id,
             executable_sha256=binary.sha256,
         )
-        spec: dict[str, tuple[CapabilityKind, dict[str, object]]] = {
+        spec: dict[str, tuple[CapabilityKind, dict[str, Any]]] = {
             "--max-context": (CapabilityKind.INT, {"minimum": 512, "maximum": 131072, "default": 4096}),
             "--max-new": (CapabilityKind.INT, {"minimum": 1, "maximum": 131072, "default": 16}),
             "--kv": (
@@ -154,7 +162,10 @@ class StrataAdapter(InferenceAdapter):
             "--mmap-experts": (CapabilityKind.BOOL, {"default": False}),
             "--batch": (CapabilityKind.INT, {"minimum": 1, "maximum": 8, "default": 1}),
             "--serve": (CapabilityKind.BOOL, {"default": False}),
-            "--ple-io": (CapabilityKind.ENUM, {"legal_values": ("direct", "mmap", "ram"), "default": "direct"}),
+            "--ple-io": (
+                CapabilityKind.ENUM,
+                {"legal_values": ("direct", "mmap", "ram"), "default": "direct"},
+            ),
             "--gpu": (CapabilityKind.STRING, {"default": "0"}),
         }
         descriptors = []
@@ -162,7 +173,7 @@ class StrataAdapter(InferenceAdapter):
             if key not in flags:
                 continue
             impact = ImpactClass.P0 if key in {"--max-context", "--kv", "--expert-cache"} else ImpactClass.P1
-            descriptors.append(descriptor(key, kind, impact=impact, **extra))  # type: ignore[arg-type]
+            descriptors.append(descriptor(key, kind, impact=impact, **extra))
         return EngineCapabilityManifest(
             engine=engine,
             backend=binary.backend,
@@ -222,20 +233,45 @@ class StrataAdapter(InferenceAdapter):
             checked_at=utcnow(),
             reasons=tuple(reasons),
             warnings=tuple(warnings),
-            support=support,  # type: ignore[arg-type]
+            support=support,
         )
 
     def search_space(self, request: SearchSpaceRequest) -> SearchSpaceSpec:
         return SearchSpaceSpec(
             engine_id=EngineId.STRATA,
             dimensions=(
-                ParameterDimension(name="kv", kind=DimensionKind.CATEGORICAL, choices=("fp16", "int8", "q4_0", "k8v4"), default="fp16", quality_risk=True),
-                ParameterDimension(name="expert_cache", kind=DimensionKind.CATEGORICAL, choices=("auto", 0, 16, 32, 64), default="auto"),
-                ParameterDimension(name="prefill", kind=DimensionKind.CATEGORICAL, choices=("auto", 1024, 2048, 4096), default="auto"),
+                ParameterDimension(
+                    name="kv",
+                    kind=DimensionKind.CATEGORICAL,
+                    choices=("fp16", "int8", "q4_0", "k8v4"),
+                    default="fp16",
+                    quality_risk=True,
+                ),
+                ParameterDimension(
+                    name="expert_cache",
+                    kind=DimensionKind.CATEGORICAL,
+                    choices=("auto", 0, 16, 32, 64),
+                    default="auto",
+                ),
+                ParameterDimension(
+                    name="prefill",
+                    kind=DimensionKind.CATEGORICAL,
+                    choices=("auto", 1024, 2048, 4096),
+                    default="auto",
+                ),
                 ParameterDimension(name="spec", kind=DimensionKind.INT, minimum=0, maximum=8, default=4),
-                ParameterDimension(name="pool_workers", kind=DimensionKind.INT, minimum=1, maximum=32, default=15),
-                ParameterDimension(name="resident_experts", kind=DimensionKind.CATEGORICAL, choices=(False, True), default=False),
-                ParameterDimension(name="mmap_experts", kind=DimensionKind.CATEGORICAL, choices=(False, True), default=False),
+                ParameterDimension(
+                    name="pool_workers", kind=DimensionKind.INT, minimum=1, maximum=32, default=15
+                ),
+                ParameterDimension(
+                    name="resident_experts",
+                    kind=DimensionKind.CATEGORICAL,
+                    choices=(False, True),
+                    default=False,
+                ),
+                ParameterDimension(
+                    name="mmap_experts", kind=DimensionKind.CATEGORICAL, choices=(False, True), default=False
+                ),
             ),
             fixed_parameters={"max_context": request.context_tokens},
             constraints=("Only flags observed in the installed build are emitted.",),
@@ -243,7 +279,9 @@ class StrataAdapter(InferenceAdapter):
             notes=("Strata's native calibration is not a benchmark protocol and is not used here.",),
         )
 
-    def validate_candidate(self, candidate: CandidateSpec, engine: EngineCapabilityManifest) -> tuple[str, ...]:
+    def validate_candidate(
+        self, candidate: CandidateSpec, engine: EngineCapabilityManifest
+    ) -> tuple[str, ...]:
         mapping = {
             "kv": "--kv",
             "expert_cache": "--expert-cache",
@@ -295,7 +333,10 @@ class StrataAdapter(InferenceAdapter):
     ) -> ExecutionPlan:
         raise UnsupportedCapabilityError(
             "the installed Strata build exposes no benchmark protocol; Phase 4 must run the uniform API lane",
-            details={"observed_commands": ["strata generate"], "missing": ["strata bench run", "strata engine calibrate"]},
+            details={
+                "observed_commands": ["strata generate"],
+                "missing": ["strata bench run", "strata engine calibrate"],
+            },
         )
 
     def _profile(self, candidate: CandidateSpec, model: ModelArtifact) -> dict[str, object]:
@@ -310,7 +351,8 @@ class StrataAdapter(InferenceAdapter):
         args = [
             item
             for item in base_args
-            if item not in {"--max-context", "--kv", "--expert-cache", "--prefill", "--spec", "--pool-workers"}
+            if item
+            not in {"--max-context", "--kv", "--expert-cache", "--prefill", "--spec", "--pool-workers"}
         ]
         args.extend(["--pack", pack_path])
         args.extend(["--max-context", str(int(candidate.context))])
@@ -399,7 +441,9 @@ class StrataAdapter(InferenceAdapter):
             readiness_timeout_seconds=300,
         )
 
-    def parse_microbench_evidence(self, evidence: RawEvidence, candidate: CandidateSpec) -> MicrobenchObservation:
+    def parse_microbench_evidence(
+        self, evidence: RawEvidence, candidate: CandidateSpec
+    ) -> MicrobenchObservation:
         raise UnsupportedCapabilityError(
             "the installed Strata build exposes no native microbenchmark evidence schema",
             details={"evidence_content_type": evidence.content_type},
@@ -462,7 +506,8 @@ class StrataAdapter(InferenceAdapter):
             gpu_temperature_c=float(temp) if isinstance(temp, (int, float)) else None,
             unavailable_reasons=unavailable,
             warnings=(
-                "This serving evidence is a Lab Custom Protocol measurement, not a Strata standard benchmark score.",
+                "This serving evidence is a Lab Custom Protocol measurement, not a Strata "
+                "standard benchmark score.",
                 "Native calibration output is not treated as an optimum.",
             ),
         )
@@ -483,17 +528,29 @@ class StrataAdapter(InferenceAdapter):
         engine_executable = model.metadata.get("engine_executable")
         engine_sha256 = model.metadata.get("engine_sha256")
         server_script = model.metadata.get("server_script")
-        if not isinstance(engine_executable, str) or not isinstance(engine_sha256, str) or not isinstance(server_script, str):
-            raise ValueError("Strata recipe requires engine_executable, engine_sha256 and server_script metadata")
+        if (
+            not isinstance(engine_executable, str)
+            or not isinstance(engine_sha256, str)
+            or not isinstance(server_script, str)
+        ):
+            raise ValueError(
+                "Strata recipe requires engine_executable, engine_sha256 and server_script metadata"
+            )
         if not hardware.gpus:
             raise ValueError("Strata recipe requires a GPU hardware snapshot")
-        peaks = [obs.metrics.gpu_vram_peak_bytes for obs in evidence.observations if obs.metrics.gpu_vram_peak_bytes]
+        peaks = [
+            obs.metrics.gpu_vram_peak_bytes
+            for obs in evidence.observations
+            if obs.metrics.gpu_vram_peak_bytes
+        ]
         if not peaks:
             raise ValueError("Strata recipe requires measured peak VRAM, not an estimate")
         gpu = hardware.gpus[0]
         profile = self._profile(candidate, model)
         profile_content = json.dumps(profile, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
-        recipe_id = stable_id("recipe", candidate.candidate_id, model.artifact_digest, engine_sha256, int(candidate.context))
+        recipe_id = stable_id(
+            "recipe", candidate.candidate_id, model.artifact_digest, engine_sha256, int(candidate.context)
+        )
         return DeploymentRecipe(
             id=recipe_id,
             engine=RecipeEngine(
@@ -522,7 +579,18 @@ class StrataAdapter(InferenceAdapter):
             ),
             objective=evidence.objective,
             context_tokens=int(candidate.context),
-            launch=RecipeLaunch(executable=binary.path, argv=(server_script, "--engine", "strata", "--config", "strata-profile.json", "--host", "127.0.0.1")),
+            launch=RecipeLaunch(
+                executable=binary.path,
+                argv=(
+                    server_script,
+                    "--engine",
+                    "strata",
+                    "--config",
+                    "strata-profile.json",
+                    "--host",
+                    "127.0.0.1",
+                ),
+            ),
             validation=RecipeValidationRefs(
                 protocol=evidence.observations[0].protocol,
                 experiment_id=evidence.experiment_id,
@@ -533,7 +601,8 @@ class StrataAdapter(InferenceAdapter):
             ),
             rollback=RecipeRollback(required_smoke_tests=("ready", "one_token", "profile_identity")),
             notes=(
-                "Strata native profile is generated in the experiment sandbox; original operator profiles are never modified.",
+                "Strata native profile is generated in the experiment sandbox; original "
+                "operator profiles are never modified.",
                 f"profile_sha256={sha256_text(profile_content)}",
             ),
         )

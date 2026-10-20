@@ -6,7 +6,15 @@ from typing import Any
 
 from pydantic import Field, field_validator
 
-from .base import AwareTimestamp, FrozenModel, Identifier, JsonScalar, NonEmptyStr, NonNegativeInt, PositiveInt, Sha256
+from .base import (
+    AwareTimestamp,
+    FrozenModel,
+    Identifier,
+    NonEmptyStr,
+    NonNegativeInt,
+    PositiveInt,
+    Sha256,
+)
 from .enums import EngineId
 from .ids import sha256_hex
 from .version import SCHEMA_VERSION
@@ -80,7 +88,8 @@ class ModelArtifactSnapshot(FrozenModel):
     schema_version: NonEmptyStr = SCHEMA_VERSION
     warnings: tuple[str, ...] = ()
 
-    def digest(self) -> str:
+    def digest(self, *, exclude: frozenset[str] = frozenset()) -> str:
+        del exclude
         return sha256_hex(
             {
                 "worker_id": self.worker_id,

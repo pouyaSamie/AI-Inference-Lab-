@@ -9,7 +9,6 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
-    Float,
     ForeignKey,
     Index,
     Integer,
@@ -123,6 +122,8 @@ class ExperimentRow(Base):
     idempotency_key: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
     request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     paused: Mapped[bool] = mapped_column(Boolean, default=False)
+    preflight_passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    preflight_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -133,7 +134,9 @@ class ExperimentRow(Base):
 
 class ExperimentContextRow(Base):
     __tablename__ = "experiment_contexts"
-    __table_args__ = (UniqueConstraint("experiment_id", "context_tokens", name="uq_experiment_contexts_context"),)
+    __table_args__ = (
+        UniqueConstraint("experiment_id", "context_tokens", name="uq_experiment_contexts_context"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     experiment_id: Mapped[str] = mapped_column(ForeignKey("experiments.experiment_id", ondelete="CASCADE"))
@@ -150,7 +153,9 @@ class StudyRow(Base):
     __tablename__ = "studies"
 
     study_id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    experiment_id: Mapped[str] = mapped_column(ForeignKey("experiments.experiment_id", ondelete="CASCADE"), unique=True)
+    experiment_id: Mapped[str] = mapped_column(
+        ForeignKey("experiments.experiment_id", ondelete="CASCADE"), unique=True
+    )
     engine_id: Mapped[str] = mapped_column(String(32))
     model_digest: Mapped[str] = mapped_column(String(64))
     worker_profile_digest: Mapped[str] = mapped_column(String(64))
@@ -159,6 +164,7 @@ class StudyRow(Base):
     state: Mapped[str] = mapped_column(String(32), default="pending")
     search_space_json: Mapped[dict[str, Any]] = mapped_column(JSON)
     maximum_trials: Mapped[int] = mapped_column(Integer)
+    proposal_attempts: Mapped[int] = mapped_column(Integer, default=0)
     seed: Mapped[int] = mapped_column(Integer)
     objective: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -179,9 +185,11 @@ class CandidateRow(Base):
     trial_number: Mapped[int] = mapped_column(Integer)
     context_tokens: Mapped[int] = mapped_column(Integer)
     parameters_json: Mapped[dict[str, Any]] = mapped_column(JSON)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON)
     parameter_digest: Mapped[str] = mapped_column(String(64))
     semantic_digest: Mapped[str] = mapped_column(String(64))
     state: Mapped[str] = mapped_column(String(32), default="proposed")
+    optimizer_finalized: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -252,8 +260,12 @@ class WorkerCommandRow(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     failure_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    experiment_id: Mapped[str | None] = mapped_column(ForeignKey("experiments.experiment_id", ondelete="SET NULL"), nullable=True)
-    candidate_id: Mapped[str | None] = mapped_column(ForeignKey("candidates.candidate_id", ondelete="SET NULL"), nullable=True)
+    experiment_id: Mapped[str | None] = mapped_column(
+        ForeignKey("experiments.experiment_id", ondelete="SET NULL"), nullable=True
+    )
+    candidate_id: Mapped[str | None] = mapped_column(
+        ForeignKey("candidates.candidate_id", ondelete="SET NULL"), nullable=True
+    )
     expected_snapshot_revision: Mapped[int] = mapped_column(Integer, default=0)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

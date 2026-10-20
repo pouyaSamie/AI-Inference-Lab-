@@ -41,11 +41,13 @@ class Settings(BaseSettings):
     worker_offline_after_seconds: int = Field(default=120, ge=5, le=86_400)
     snapshot_max_age_seconds: int = Field(default=86_400, ge=60, le=2_592_000)
     command_max_attempts: int = Field(default=5, ge=1, le=100)
+    trial_timeout_seconds: int = Field(default=7200, ge=30, le=86_400)
     max_command_batch: int = Field(default=5, ge=1, le=50)
 
     optimizer_lease_seconds: int = Field(default=60, ge=5, le=3600)
     optimizer_offline_after_seconds: int = Field(default=30, ge=5, le=3600)
     optimizer_poll_wait_seconds: int = Field(default=20, ge=0, le=55)
+    optimizer_max_attempts: int = Field(default=8, ge=1, le=100)
 
     scheduler_enabled: bool = True
     scheduler_interval_seconds: float = Field(default=0.5, ge=0.05, le=60)
@@ -63,6 +65,7 @@ class Settings(BaseSettings):
         ]
     )
     allow_simulation: bool = True
+    execution_mode: Literal["simulated", "real"] = "simulated"
     document_openapi: bool = True
 
     @model_validator(mode="after")
@@ -71,12 +74,16 @@ class Settings(BaseSettings):
         optimizer = make_url(self.optimizer_db_url)
         if self.controller_db_url == self.optimizer_db_url:
             raise ValueError("controller and optimizer databases must be separate")
-        if controller.get_backend_name() == "sqlite" and optimizer.get_backend_name() == "sqlite":
-            if controller.database and optimizer.database:
-                controller_path = Path(controller.database).resolve()
-                optimizer_path = Path(optimizer.database).resolve()
-                if controller_path == optimizer_path:
-                    raise ValueError("controller and optimizer must not share a SQLite file")
+        if (
+            controller.get_backend_name() == "sqlite"
+            and optimizer.get_backend_name() == "sqlite"
+            and controller.database
+            and optimizer.database
+        ):
+            controller_path = Path(controller.database).resolve()
+            optimizer_path = Path(optimizer.database).resolve()
+            if controller_path == optimizer_path:
+                raise ValueError("controller and optimizer must not share a SQLite file")
         return self
 
     def validate_runtime(self) -> None:
@@ -110,6 +117,7 @@ class Settings(BaseSettings):
             "optimizer_db": make_url(self.optimizer_db_url).render_as_string(hide_password=True),
             "scheduler_enabled": self.scheduler_enabled,
             "allow_simulation": self.allow_simulation,
+            "execution_mode": self.execution_mode,
         }
 
 

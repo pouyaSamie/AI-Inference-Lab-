@@ -9,7 +9,13 @@ no I/O and never claims an unobserved flag is supported.
 from __future__ import annotations
 
 import re
-from typing import ClassVar
+from collections.abc import Mapping
+from typing import Any, ClassVar
+
+from lab_core.adapter_io import AdapterDescriptor
+from lab_core.ids import sha256_text
+from lab_core.search import DimensionKind, ParameterDimension
+from lab_core.version import ADAPTER_SDK_VERSION
 
 from lab_core import (
     Backend,
@@ -33,10 +39,11 @@ from lab_core import (
     MicrobenchRow,
     ModelArtifact,
     ModelMetadata,
+    Objective,
     ProcessOutput,
     RawEvidence,
-    ReadinessPredicate,
     ReadinessKind,
+    ReadinessPredicate,
     RecipeEngine,
     RecipeHardware,
     RecipeLaunch,
@@ -52,24 +59,29 @@ from lab_core import (
     ServingObservation,
     SupportLevel,
     WorkloadSuite,
-    utcnow,
     stable_id,
+    utcnow,
 )
-from lab_core.adapter_io import AdapterDescriptor
-from lab_core.ids import sha256_text
-from lab_core.search import DimensionKind, ParameterDimension
-from lab_core.version import ADAPTER_SDK_VERSION
 
-from ..base.parsing import descriptor, observed_flags, parse_json_document, probe_command, require_flags, server_readiness
-from ..base.results import ValidatedEvidence
+from ..base.parsing import (
+    descriptor,
+    observed_flags,
+    parse_json_document,
+    probe_command,
+    require_flags,
+    server_readiness,
+)
 from ..base.protocol import InferenceAdapter
+from ..base.results import ValidatedEvidence
 
-_VERSION_RE = re.compile(r"version:\s*(?P<version>\S+)\s*\(build\s+(?P<build>\d+),\s*commit\s+(?P<commit>[0-9a-fA-F]+)\)")
+_VERSION_RE = re.compile(
+    r"version:\s*(?P<version>\S+)\s*\(build\s+(?P<build>\d+),\s*commit\s+(?P<commit>[0-9a-fA-F]+)\)"
+)
 _BUILT_RE = re.compile(r"built with\s+(?P<compiler>.+?)\s+for\s+(?P<platform>\S+)")
 _CUDA_RE = re.compile(r"found\s+(?P<count>\d+)\s+CUDA devices", re.IGNORECASE)
 
 
-def _as_int(parameters: dict[str, object], key: str, default: int) -> int:
+def _as_int(parameters: Mapping[str, object], key: str, default: int) -> int:
     value = parameters.get(key)
     if value is None:
         return default
@@ -87,7 +99,7 @@ def _as_str(parameters: dict[str, object], key: str, default: str) -> str:
     return value
 
 
-def _as_bool(parameters: dict[str, object], key: str, default: bool) -> bool:
+def _as_bool(parameters: Mapping[str, object], key: str, default: bool) -> bool:
     value = parameters.get(key)
     if value is None:
         return default
@@ -144,7 +156,7 @@ class LlamaCppAdapter(InferenceAdapter):
         flags = observed_flags(help_text)
         require_flags(flags, ("--model",))
         descriptors = []
-        spec: dict[str, tuple[CapabilityKind, dict[str, object]]] = {
+        spec: dict[str, tuple[CapabilityKind, dict[str, Any]]] = {
             "--ctx-size": (CapabilityKind.INT, {"minimum": 512, "maximum": 131072, "default": 0}),
             "--n-gpu-layers": (CapabilityKind.INT, {"minimum": -1, "maximum": 4096, "default": -1}),
             "--threads": (CapabilityKind.INT, {"minimum": 1, "maximum": 256, "default": -1}),
@@ -177,7 +189,10 @@ class LlamaCppAdapter(InferenceAdapter):
                 CapabilityKind.ENUM,
                 {"legal_values": ("auto", "none", "mmap", "mlock", "mmap+mlock", "dio"), "default": "auto"},
             ),
-            "--split-mode": (CapabilityKind.ENUM, {"legal_values": ("none", "layer", "row", "tensor"), "default": "layer"}),
+            "--split-mode": (
+                CapabilityKind.ENUM,
+                {"legal_values": ("none", "layer", "row", "tensor"), "default": "layer"},
+            ),
             "--no-kv-offload": (CapabilityKind.BOOL, {"default": False}),
             "--metrics": (CapabilityKind.BOOL, {"default": False}),
             "--jinja": (CapabilityKind.BOOL, {"default": True}),
@@ -188,18 +203,25 @@ class LlamaCppAdapter(InferenceAdapter):
             "--n-prompt": (CapabilityKind.INT, {"minimum": 1, "maximum": 131072, "default": 512}),
             "--n-gen": (CapabilityKind.INT, {"minimum": 1, "maximum": 131072, "default": 128}),
             "--n-depth": (CapabilityKind.INT, {"minimum": 0, "maximum": 131072, "default": 0}),
-            "--output": (CapabilityKind.ENUM, {"legal_values": ("csv", "json", "jsonl", "md", "sql"), "default": "md"}),
+            "--output": (
+                CapabilityKind.ENUM,
+                {"legal_values": ("csv", "json", "jsonl", "md", "sql"), "default": "md"},
+            ),
         }
         for key, (kind, extra) in spec.items():
             if key not in flags:
                 continue
-            impact = ImpactClass.P0 if key in {"--n-gpu-layers", "--ctx-size", "--flash-attn", "--cache-type-k", "--cache-type-v"} else ImpactClass.P1
+            impact = (
+                ImpactClass.P0
+                if key in {"--n-gpu-layers", "--ctx-size", "--flash-attn", "--cache-type-k", "--cache-type-v"}
+                else ImpactClass.P1
+            )
             descriptors.append(
                 descriptor(
                     key,
                     kind,
-                    impact=extra.pop("impact_class", impact),  # type: ignore[arg-type]
-                    **extra,  # type: ignore[arg-type]
+                    impact=extra.pop("impact_class", impact),
+                    **extra,
                 )
             )
         return EngineCapabilityManifest(
@@ -211,7 +233,8 @@ class LlamaCppAdapter(InferenceAdapter):
             version_output_sha256=sha256_text(version_text),
             notes=(
                 f"compiler/platform: {built.group('compiler') if built else 'unknown'}",
-                "Presence of a flag is observed; legal enum values are versioned approved rules where help omits them.",
+                "Presence of a flag is observed; legal enum values are versioned approved "
+                "rules where help omits them.",
             ),
         )
 
@@ -228,7 +251,9 @@ class LlamaCppAdapter(InferenceAdapter):
             quantization=artifact.quantization,
             context_train_tokens=artifact.metadata_context_tokens,
             moe=moe,
-            expert_count=int(artifact.metadata["expert_count"]) if isinstance(artifact.metadata.get("expert_count"), int) else None,
+            expert_count=int(artifact.metadata["expert_count"])
+            if isinstance(artifact.metadata.get("expert_count"), int)
+            else None,
             tokenizer_id=artifact.tokenizer_id,
             shard_count=len(artifact.files) or 1,
             attributes={"hashes_complete": artifact.hashes_complete()},
@@ -238,7 +263,9 @@ class LlamaCppAdapter(InferenceAdapter):
         self, model: ModelArtifact, engine: EngineCapabilityManifest, hardware: HardwareSnapshot
     ) -> CompatibilityResult:
         reasons: list[str] = []
-        if "gguf" not in model.architecture.lower() and not any(path.lower().endswith(".gguf") for path in model.path_map):
+        if "gguf" not in model.architecture.lower() and not any(
+            path.lower().endswith(".gguf") for path in model.path_map
+        ):
             reasons.append("model is not a GGUF artifact")
         missing = engine.require_supported(("--model", "--ctx-size"))
         if missing:
@@ -248,7 +275,11 @@ class LlamaCppAdapter(InferenceAdapter):
         warnings: list[str] = []
         if not model.hashes_complete():
             warnings.append("model artifact hashes are incomplete; recipes cannot be approved")
-        support = "unsupported" if any("not a GGUF" in reason for reason in reasons) else ("conditional" if reasons or warnings else "supported")
+        support = (
+            "unsupported"
+            if any("not a GGUF" in reason for reason in reasons)
+            else ("conditional" if reasons or warnings else "supported")
+        )
         return CompatibilityResult(
             compatible=not any("not a GGUF" in reason for reason in reasons),
             engine_id=EngineId.LLAMACPP,
@@ -256,7 +287,7 @@ class LlamaCppAdapter(InferenceAdapter):
             checked_at=utcnow(),
             reasons=tuple(reasons),
             warnings=tuple(warnings),
-            support=support,  # type: ignore[arg-type]
+            support=support,
         )
 
     # ---------------------------------------------------------------- search
@@ -330,7 +361,9 @@ class LlamaCppAdapter(InferenceAdapter):
             notes=("Conditional dimensions are declared explicitly for Phase 5 TPE integration.",),
         )
 
-    def validate_candidate(self, candidate: CandidateSpec, engine: EngineCapabilityManifest) -> tuple[str, ...]:
+    def validate_candidate(
+        self, candidate: CandidateSpec, engine: EngineCapabilityManifest
+    ) -> tuple[str, ...]:
         errors: list[str] = []
         mapping = {
             "gpu_layers": "--n-gpu-layers",
@@ -356,7 +389,9 @@ class LlamaCppAdapter(InferenceAdapter):
                 continue
             capability = engine.descriptor(flag)
             if capability is None:
-                errors.append(f"parameter {name!r} requires {flag}, which the installed build does not expose")
+                errors.append(
+                    f"parameter {name!r} requires {flag}, which the installed build does not expose"
+                )
                 continue
             if capability.support is not SupportLevel.SUPPORTED:
                 errors.append(f"parameter {name!r} is not supported by the installed build")
@@ -505,7 +540,9 @@ class LlamaCppAdapter(InferenceAdapter):
         )
 
     # ---------------------------------------------------------------- parsing
-    def parse_microbench_evidence(self, evidence: RawEvidence, candidate: CandidateSpec) -> MicrobenchObservation:
+    def parse_microbench_evidence(
+        self, evidence: RawEvidence, candidate: CandidateSpec
+    ) -> MicrobenchObservation:
         document = parse_json_document(evidence.text)
         if not isinstance(document, list) or not document:
             raise ValueError("llama-bench JSON evidence must be a non-empty array")
@@ -575,7 +612,9 @@ class LlamaCppAdapter(InferenceAdapter):
             output_n = timings.get("predicted_n")
             if timings.get("prompt_ms") is not None:
                 total = float(timings["prompt_ms"]) + float(timings.get("predicted_ms") or 0.0)
-            unavailable["time_to_first_token_ms"] = "derived only from client-observed streaming; not present in this endpoint"
+            unavailable["time_to_first_token_ms"] = (
+                "derived only from client-observed streaming; not present in this endpoint"
+            )
         else:
             unavailable["prefill_tokens_per_sec"] = "no per-request timings block in status evidence"
             unavailable["decode_tokens_per_sec"] = "no per-request timings block in status evidence"
@@ -615,12 +654,18 @@ class LlamaCppAdapter(InferenceAdapter):
             raise ValueError("model artifact hashes are incomplete")
         if not hardware.gpus:
             raise ValueError("a deployment recipe requires a GPU hardware snapshot")
-        peaks = [obs.metrics.gpu_vram_peak_bytes for obs in evidence.observations if obs.metrics.gpu_vram_peak_bytes]
+        peaks = [
+            obs.metrics.gpu_vram_peak_bytes
+            for obs in evidence.observations
+            if obs.metrics.gpu_vram_peak_bytes
+        ]
         if not peaks:
             raise ValueError("a deployment recipe requires measured peak VRAM, not an estimate")
         gpu = hardware.gpus[0]
         args = tuple(self._server_recipe_args(candidate, model))
-        recipe_id = stable_id("recipe", candidate.candidate_id, model.artifact_digest, binary.sha256, int(candidate.context))
+        recipe_id = stable_id(
+            "recipe", candidate.candidate_id, model.artifact_digest, binary.sha256, int(candidate.context)
+        )
         return DeploymentRecipe(
             id=recipe_id,
             engine=RecipeEngine(
@@ -666,7 +711,14 @@ class LlamaCppAdapter(InferenceAdapter):
 
     def _server_recipe_args(self, candidate: CandidateSpec, model: ModelArtifact) -> list[str]:
         params = candidate.parameters
-        args = ["-m", self._model_path(model), "--ctx-size", str(int(candidate.context)), "--host", "127.0.0.1"]
+        args = [
+            "-m",
+            self._model_path(model),
+            "--ctx-size",
+            str(int(candidate.context)),
+            "--host",
+            "127.0.0.1",
+        ]
         mapping = {
             "threads": "--threads",
             "batch": "--batch-size",
@@ -690,21 +742,14 @@ class LlamaCppAdapter(InferenceAdapter):
             context=candidate.context,
             status=FeasibilityOutcome.UNKNOWN,
             reason=(
-                "Context fit must be established by a worker-owned llama-server full-context allocation test; "
-                "a GGUF header or short llama-bench run is not proof."
+                "Context fit must be established by a worker-owned llama-server full-context "
+                "allocation test; a GGUF header or short llama-bench run is not proof."
             ),
         )
 
 
-def _objective_for(candidate: CandidateSpec) -> "Objective":  # local import to avoid a cycle
-    from lab_core import Objective
-
-    return Objective.BALANCED
-
-
-def _objective_for(candidate: CandidateSpec) -> "Objective":  # local import to avoid a cycle
-    from lab_core import Objective
-
+def _objective_for(candidate: CandidateSpec) -> Objective:
+    del candidate
     return Objective.BALANCED
 
 

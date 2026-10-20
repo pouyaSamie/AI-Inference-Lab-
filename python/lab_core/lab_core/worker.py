@@ -97,7 +97,9 @@ class WorkerSnapshot(FrozenModel):
         return sha256_hex(
             {
                 "worker_id": self.worker_id,
-                "hardware": self.hardware.model_dump(mode="json", exclude={"ram_available_bytes", "collected_at"}),
+                "hardware": self.hardware.model_dump(
+                    mode="json", exclude={"ram_available_bytes", "collected_at"}
+                ),
                 "engines": [engine.digest() for engine in self.engines],
                 "models": [model.artifact_digest for model in self.models],
                 "schema_version": self.schema_version,

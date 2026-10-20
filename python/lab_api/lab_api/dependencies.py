@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, cast
 
 from fastapi import Request
 from sqlalchemy.orm import Session
@@ -25,7 +25,7 @@ def get_session(request: Request) -> Iterator[Session]:
 
 
 def get_settings(request: Request) -> Settings:
-    return request.app.state.settings
+    return cast(Settings, request.app.state.settings)
 
 
 def get_request_id(request: Request) -> str:

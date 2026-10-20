@@ -4,14 +4,24 @@ from __future__ import annotations
 
 from pydantic import Field, model_validator
 
-from .base import AwareTimestamp, FrozenModel, Identifier, NonEmptyStr, NonNegativeInt, PositiveInt, Probability, Sha256, utcnow
+from .base import (
+    AwareTimestamp,
+    FrozenModel,
+    Identifier,
+    NonEmptyStr,
+    NonNegativeInt,
+    PositiveInt,
+    Probability,
+    Sha256,
+    utcnow,
+)
 from .enums import (
     ContextLength,
     EvidenceKind,
     FailureKind,
     MeasurementStatus,
-    OOMStage,
     ObservationStatus,
+    OOMStage,
     QualityGateStatus,
 )
 from .execution import RawEvidenceRef
@@ -154,7 +164,11 @@ class BenchmarkObservation(FrozenModel):
             MeasurementStatus.SIMULATED,
             MeasurementStatus.SCREENING_ONLY,
         ):
-            required = REQUIRED_NATIVE_METRICS if self.evidence_kind is EvidenceKind.NATIVE_MICROBENCH else REQUIRED_SERVER_METRICS
+            required = (
+                REQUIRED_NATIVE_METRICS
+                if self.evidence_kind is EvidenceKind.NATIVE_MICROBENCH
+                else REQUIRED_SERVER_METRICS
+            )
             missing = self.metrics.missing(required)
             if missing:
                 raise ValueError(f"completed observation is missing required metrics: {missing}")
@@ -179,9 +193,17 @@ class BenchmarkObservation(FrozenModel):
             reasons.append(f"STATUS_{self.status.value.upper()}")
         if self.measurement_status is not MeasurementStatus.MEASURED:
             reasons.append(f"MEASUREMENT_{self.measurement_status.value.upper()}")
-        if self.context is ContextLength.K128 and self.effective_context is not None and self.effective_context < int(self.context):
+        if (
+            self.context is ContextLength.K128
+            and self.effective_context is not None
+            and self.effective_context < int(self.context)
+        ):
             reasons.append("CONTEXT_TRUNCATED")
-        if self.configured_context is not None and self.effective_context is not None and self.effective_context < self.configured_context:
+        if (
+            self.configured_context is not None
+            and self.effective_context is not None
+            and self.effective_context < self.configured_context
+        ):
             reasons.append("EFFECTIVE_CONTEXT_BELOW_CONFIGURED")
         for gate in self.quality_gates:
             if gate.status is QualityGateStatus.FAILED:

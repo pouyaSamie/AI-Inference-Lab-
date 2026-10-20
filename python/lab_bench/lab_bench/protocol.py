@@ -10,9 +10,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from lab_core import ContextLength, FrozenModel, Identifier, NonEmptyStr, PositiveInt, Sha256, UnitFraction
 from lab_core.ids import sha256_hex, stable_id
 from lab_core.version import WORKLOAD_PROTOCOL
+
+from lab_core import ContextLength, FrozenModel, Identifier, NonEmptyStr, PositiveInt, Sha256, UnitFraction
 
 CONTEXT_MATRIX: tuple[ContextLength, ...] = (
     ContextLength.K4,
@@ -55,7 +56,7 @@ class WorkloadCase(FrozenModel):
     tokenizer_id: str | None = None
     protocol: NonEmptyStr = WORKLOAD_PROTOCOL
 
-    def validate(self) -> None:
+    def validate_case(self) -> None:
         if self.target_input_tokens + self.output_tokens > int(self.context):
             raise ProtocolViolation(
                 f"case {self.case_id} exceeds context: "
@@ -107,7 +108,7 @@ def plan_workloads(
             seed=seed + index,
             tokenizer_id=tokenizer_id,
         )
-        case.validate()
+        case.validate_case()
         cases.append(case)
     return tuple(cases)
 
@@ -144,7 +145,7 @@ class ContextMeasurement(FrozenModel):
     truncated: bool = False
     template_overhead_tokens: int = 0
 
-    def validate(self) -> None:
+    def validate_measurement(self) -> None:
         if self.truncated:
             raise ProtocolViolation("measurement reports truncation")
         if self.effective_context < self.configured_context:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import model_validator
 
 from .base import AwareTimestamp, FrozenModel, JsonScalar, NonEmptyStr, Sha256
 from .enums import Backend, EngineId, ImpactClass

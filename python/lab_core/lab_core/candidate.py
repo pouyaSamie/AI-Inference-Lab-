@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from pydantic import Field, model_validator
 
-from .base import FrozenModel, Identifier, JsonScalar, NonEmptyStr, NonNegativeInt, Parameters, PositiveInt, Sha256, parameters_digest
+from .base import (
+    FrozenModel,
+    Identifier,
+    NonEmptyStr,
+    NonNegativeInt,
+    Parameters,
+    PositiveInt,
+    Sha256,
+    parameters_digest,
+)
 from .enums import CandidateState, ContextLength
 from .ids import sha256_hex, stable_id
 from .version import SCHEMA_VERSION

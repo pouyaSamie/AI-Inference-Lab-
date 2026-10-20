@@ -47,15 +47,17 @@ class SearchPolicy(FrozenModel):
     @model_validator(mode="after")
     def _apply_depth_defaults(self) -> SearchPolicy:
         defaults = SEARCH_DEPTH_POLICY[self.depth]
-        if self.max_candidates is None:
-            object.__setattr__(self, "max_candidates", defaults[0])
-        if self.screening_replications is None:
-            object.__setattr__(self, "screening_replications", defaults[1])
-        if self.finalist_count is None:
-            object.__setattr__(self, "finalist_count", defaults[2])
-        if self.final_replications is None:
-            object.__setattr__(self, "final_replications", defaults[3])
-        if self.finalist_count > self.max_candidates:
+        max_candidates = self.max_candidates if self.max_candidates is not None else defaults[0]
+        screening_replications = (
+            self.screening_replications if self.screening_replications is not None else defaults[1]
+        )
+        finalist_count = self.finalist_count if self.finalist_count is not None else defaults[2]
+        final_replications = self.final_replications if self.final_replications is not None else defaults[3]
+        object.__setattr__(self, "max_candidates", max_candidates)
+        object.__setattr__(self, "screening_replications", screening_replications)
+        object.__setattr__(self, "finalist_count", finalist_count)
+        object.__setattr__(self, "final_replications", final_replications)
+        if finalist_count > max_candidates:
             raise ValueError("finalist_count cannot exceed max_candidates")
         return self
 
@@ -175,7 +177,15 @@ class ContextFeasibility(FrozenModel):
 
     @model_validator(mode="after")
     def _reason_for_non_feasible(self) -> ContextFeasibility:
-        if self.status in (FeasibilityOutcome.UNSUPPORTED, FeasibilityOutcome.RESOURCE_INFEASIBLE, FeasibilityOutcome.INCONCLUSIVE) and not self.reason:
+        if (
+            self.status
+            in (
+                FeasibilityOutcome.UNSUPPORTED,
+                FeasibilityOutcome.RESOURCE_INFEASIBLE,
+                FeasibilityOutcome.INCONCLUSIVE,
+            )
+            and not self.reason
+        ):
             raise ValueError("non-feasible context requires an explicit reason")
         return self
 

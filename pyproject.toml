@@ -46,6 +46,7 @@ lab-worker = { workspace = true }
 target-version = "py312"
 line-length = 110
 src = ["python"]
+exclude = ["attic", ".venv", "node_modules", "build", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "ASYNC", "S", "SIM", "RUF"]
@@ -60,7 +61,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S105", "S106", "S108", "S311"]
 "python/lab_worker/**" = ["S603", "S607"]
-"scripts/**" = ["S603", "S607"]
+"python/lab_adapters/**" = ["S105"]
+"python/lab_core/lab_core/scoring.py" = ["S311"]
+"scripts/**" = ["S105", "S106", "S108", "S603", "S607"]
 
 [tool.mypy]
 python_version = "3.12"

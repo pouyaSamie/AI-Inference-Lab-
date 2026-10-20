@@ -10,6 +10,11 @@ from __future__ import annotations
 import re
 from typing import ClassVar
 
+from lab_core.adapter_io import AdapterDescriptor
+from lab_core.ids import sha256_text
+from lab_core.search import DimensionKind, ParameterDimension
+from lab_core.version import ADAPTER_SDK_VERSION
+
 from lab_core import (
     Backend,
     CandidateSpec,
@@ -45,17 +50,13 @@ from lab_core import (
     SearchSpaceSpec,
     ServerExecutionPlan,
     ServingObservation,
-    utcnow,
     stable_id,
+    utcnow,
 )
-from lab_core.adapter_io import AdapterDescriptor
-from lab_core.ids import sha256_text
-from lab_core.search import DimensionKind, ParameterDimension
-from lab_core.version import ADAPTER_SDK_VERSION
 
 from ..base.parsing import descriptor, parse_json_document, probe_command
-from ..base.results import ValidatedEvidence
 from ..base.protocol import InferenceAdapter
+from ..base.results import ValidatedEvidence
 
 _VERSION_RE = re.compile(r"mock-adapter\s+(?P<version>\S+)")
 
@@ -70,7 +71,9 @@ class MockFutureAdapter(InferenceAdapter):
             adapter_schema=self.adapter_schema,
             supported_models=("mock-pack",),
             requires_native_binary=True,
-            notes=("Conformance stub only. No production inference engine is shipped under this identifier.",),
+            notes=(
+                "Conformance stub only. No production inference engine is shipped under this identifier.",
+            ),
         )
 
     def build_probe_commands(self, binary: RegisteredBinary) -> tuple[CommandSpec, ...]:
@@ -96,8 +99,17 @@ class MockFutureAdapter(InferenceAdapter):
             backend=Backend.CUDA,
             probed_at=utcnow(),
             descriptors=(
-                descriptor("--workers", CapabilityKind.INT, minimum=1, maximum=64, default=4, impact=ImpactClass.P1),
-                descriptor("--max-context", CapabilityKind.INT, minimum=512, maximum=131072, default=4096, impact=ImpactClass.P0),
+                descriptor(
+                    "--workers", CapabilityKind.INT, minimum=1, maximum=64, default=4, impact=ImpactClass.P1
+                ),
+                descriptor(
+                    "--max-context",
+                    CapabilityKind.INT,
+                    minimum=512,
+                    maximum=131072,
+                    default=4096,
+                    impact=ImpactClass.P0,
+                ),
             ),
             help_sha256=sha256_text(text),
         )
@@ -132,7 +144,9 @@ class MockFutureAdapter(InferenceAdapter):
             max_proposals=32,
         )
 
-    def validate_candidate(self, candidate: CandidateSpec, engine: EngineCapabilityManifest) -> tuple[str, ...]:
+    def validate_candidate(
+        self, candidate: CandidateSpec, engine: EngineCapabilityManifest
+    ) -> tuple[str, ...]:
         errors: list[str] = []
         for name, value in candidate.parameters.items():
             if name not in {"workers", "max_context"}:
@@ -192,7 +206,15 @@ class MockFutureAdapter(InferenceAdapter):
         command = CommandSpec(
             executable_id=binary.executable_id,
             executable_sha256=binary.sha256,
-            argv=("--serve", "--host", "127.0.0.1", "--port", str(port), "--max-context", str(int(candidate.context))),
+            argv=(
+                "--serve",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(port),
+                "--max-context",
+                str(int(candidate.context)),
+            ),
             env={"LC_ALL": "C"},
             cwd=sandbox.work_dir,
             timeout_seconds=600,
@@ -210,7 +232,9 @@ class MockFutureAdapter(InferenceAdapter):
             readiness_timeout_seconds=120,
         )
 
-    def parse_microbench_evidence(self, evidence: RawEvidence, candidate: CandidateSpec) -> MicrobenchObservation:
+    def parse_microbench_evidence(
+        self, evidence: RawEvidence, candidate: CandidateSpec
+    ) -> MicrobenchObservation:
         document = parse_json_document(evidence.text)
         prefill = float(document["prefill_tokens_per_sec"])
         decode = float(document["decode_tokens_per_sec"])
@@ -254,12 +278,18 @@ class MockFutureAdapter(InferenceAdapter):
             raise ValueError("recipe requires validated evidence")
         gpu = hardware.gpus[0]
         peak = next(
-            (obs.metrics.gpu_vram_peak_bytes for obs in evidence.observations if obs.metrics.gpu_vram_peak_bytes),
+            (
+                obs.metrics.gpu_vram_peak_bytes
+                for obs in evidence.observations
+                if obs.metrics.gpu_vram_peak_bytes
+            ),
             None,
         )
         if peak is None:
             raise ValueError("recipe requires measured peak VRAM")
-        recipe_id = stable_id("recipe", candidate.candidate_id, model.artifact_digest, binary.sha256, int(candidate.context))
+        recipe_id = stable_id(
+            "recipe", candidate.candidate_id, model.artifact_digest, binary.sha256, int(candidate.context)
+        )
         return DeploymentRecipe(
             id=recipe_id,
             engine=RecipeEngine(
@@ -286,7 +316,9 @@ class MockFutureAdapter(InferenceAdapter):
             ),
             objective=evidence.objective,
             context_tokens=int(candidate.context),
-            launch=RecipeLaunch(executable=binary.path, argv=("--serve", "--max-context", str(int(candidate.context)))),
+            launch=RecipeLaunch(
+                executable=binary.path, argv=("--serve", "--max-context", str(int(candidate.context)))
+            ),
             validation=RecipeValidationRefs(
                 protocol=evidence.observations[0].protocol,
                 experiment_id=evidence.experiment_id,

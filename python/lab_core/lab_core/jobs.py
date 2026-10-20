@@ -44,7 +44,14 @@ ALLOWED_TRANSITIONS: dict[JobState, frozenset[JobState]] = {
         }
     ),
     JobState.PAUSED: frozenset(
-        {JobState.RUNNING, JobState.CANCELLING, JobState.FAILED, JobState.BLOCKED, JobState.COMPLETED}
+        {
+            JobState.READY,
+            JobState.RUNNING,
+            JobState.CANCELLING,
+            JobState.FAILED,
+            JobState.BLOCKED,
+            JobState.COMPLETED,
+        }
     ),
     JobState.CANCELLING: frozenset({JobState.CANCELLED, JobState.FAILED}),
     JobState.COMPLETED: frozenset(),

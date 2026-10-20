@@ -6,9 +6,9 @@ from enum import StrEnum
 
 from pydantic import Field, field_validator, model_validator
 
-from .base import FrozenModel, Identifier, NonEmptyStr, PositiveInt, Sha256, utcnow, AwareTimestamp
+from .base import AwareTimestamp, FrozenModel, Identifier, NonEmptyStr, PositiveInt, Sha256, utcnow
 from .enums import EngineId
-from .ids import stable_id
+from .ids import sha256_text, stable_id
 from .version import SCHEMA_VERSION
 
 
@@ -47,7 +47,11 @@ class ReadinessPredicate(FrozenModel):
     def _target_required(self) -> ReadinessPredicate:
         if self.kind in (ReadinessKind.HTTP, ReadinessKind.OUTPUT_PATTERN) and not self.target:
             raise ValueError("readiness predicate requires a target")
-        if self.kind is ReadinessKind.HTTP and self.target and not self.target.startswith(("http://", "https://")):
+        if (
+            self.kind is ReadinessKind.HTTP
+            and self.target
+            and not self.target.startswith(("http://", "https://"))
+        ):
             raise ValueError("HTTP readiness target must be an explicit loopback URL")
         return self
 

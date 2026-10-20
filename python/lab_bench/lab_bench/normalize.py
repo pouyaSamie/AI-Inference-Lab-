@@ -45,7 +45,7 @@ def native_metrics(
         unavailable["prefill_tokens_per_sec"] = "native lane reported no prompt-processing measurement"
     if decode_tokens_per_sec is None:
         unavailable["decode_tokens_per_sec"] = "native lane reported no generation measurement"
-    payload: dict[str, float | int | bool | None | dict[str, str]] = {
+    payload: dict[str, float | int | bool | dict[str, str] | None] = {
         "prefill_tokens_per_sec": prefill_tokens_per_sec,
         "decode_tokens_per_sec": decode_tokens_per_sec,
         "unavailable_reasons": unavailable,
