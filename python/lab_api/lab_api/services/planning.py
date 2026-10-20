@@ -47,7 +47,7 @@ def _queue_scan(session: Session, settings: Settings, worker_id: str, reason: st
             include_engines=True,
             include_models=True,
             include_hardware=True,
-            hash_models=False,
+            hash_models=settings.scan_hash_models,
             reason=reason,
         ),
         idempotency_key=f"scan:{worker_id}:{new_id('req')}",

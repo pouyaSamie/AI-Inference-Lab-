@@ -1,6 +1,10 @@
 # Phase 2 backlog — real worker execution and evidence
 
-Status: planning only. Nothing in this file is implemented in the Phase 1 tree.
+Status: **2.1 conformance expansion, 2.2 process supervisor, 2.3 GPU leases,
+2.4 real handlers and 2.12 systemd authoring are implemented and checked.**
+2.0 real measurements, 2.5 corpus, 2.6 benchmark protocol, 2.7 ledger and
+2.8–2.14 belong to Phases 4–8 and remain open. See
+`docs/progress/PHASE_2_REPORT.md` for what was actually run.
 
 Phase 2 must preserve the Phase 1 contract boundary:
 

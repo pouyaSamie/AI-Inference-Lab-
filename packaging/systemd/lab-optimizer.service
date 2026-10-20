@@ -1,0 +1,37 @@
+[Unit]
+Description=AI Inference Optimization Lab Optuna optimizer
+Documentation=file:/opt/ai-inference-lab/docs/ARCHITECTURE.md
+After=lab-controller.service
+Wants=lab-controller.service
+
+[Service]
+Type=simple
+User=ailab
+Group=ailab
+WorkingDirectory=/opt/ai-inference-lab
+EnvironmentFile=/etc/ai-inference-lab/lab.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ai-inference-lab/.venv/bin/lab-optimizer
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillMode=mixed
+StateDirectory=ai-inference-lab
+LogsDirectory=ai-inference-lab
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/ai-inference-lab /var/log/ai-inference-lab
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

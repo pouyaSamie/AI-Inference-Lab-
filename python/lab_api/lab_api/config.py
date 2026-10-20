@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     min_token_length: int = Field(default=16, ge=8)
 
     worker_lease_seconds: int = Field(default=120, ge=5, le=3600)
+    worker_lease_max_seconds: int = Field(default=21_600, ge=60, le=86_400)
+    scan_hash_models: bool = True
     worker_offline_after_seconds: int = Field(default=120, ge=5, le=86_400)
     snapshot_max_age_seconds: int = Field(default=86_400, ge=60, le=2_592_000)
     command_max_attempts: int = Field(default=5, ge=1, le=100)
@@ -118,6 +120,7 @@ class Settings(BaseSettings):
             "scheduler_enabled": self.scheduler_enabled,
             "allow_simulation": self.allow_simulation,
             "execution_mode": self.execution_mode,
+            "scan_hash_models": self.scan_hash_models,
         }
 
 

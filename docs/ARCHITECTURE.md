@@ -1,8 +1,9 @@
-# Architecture — Phase 0/1 foundation
+# Architecture — Phase 0/1 foundation plus Phase 2 worker
 
-Status: implemented foundation for PRD v2.1 Phases 0/1. Phase 1 execution is
-explicitly simulated. Real engine execution, GPU ownership and production
-benchmarking are out of scope here.
+Status: Phase 1 is complete and verified. Phase 2 adds a production Linux worker
+with observed engine/model discovery, native process execution, GPU UUID leases,
+journals, sandboxes and a real executor. The simulated lane remains separate and
+its evidence can never qualify a recipe.
 
 ## 1. Process topology
 
@@ -22,10 +23,16 @@ operator / browser / future Electron UI
 ┌───────────────────────┐   ┌──────────────────────────┐
 │ lab_optimizer         │   │ lab_worker / sim worker  │
 │ Optuna RDBStorage     │   │ command ack/complete     │
-│ optuna SQLite WAL     │   │ pure adapter execution   │
-│ TPE ask/tell          │   │ simulated evidence only  │
+│ optuna SQLite WAL     │   │ real process ownership   │
+│ TPE ask/tell          │   │ or simulated fixtures    │
 └───────────────────────┘   └──────────────────────────┘
 ```
+
+The real worker has no inbound listener. It probes only configured engine
+paths, reads model metadata under configured roots, writes only beneath its
+state root, and launches argv-only subprocesses in dedicated process groups.
+The pure adapters still translate typed plans; they never spawn processes or
+touch files.
 
 The controller never imports Optuna, never starts a worker process and never
 spawns an engine. The optimizer is a separate deployable process. The worker
@@ -41,7 +48,7 @@ controller needs no inbound route to a worker.
 | `lab_adapters` | pure CLI/JSON translation, capability parsing, candidate validation, execution-plan construction | subprocess, network, filesystem, hardware probe |
 | `lab_api` | FastAPI, auth, persistence, planning, lifecycle, command queue, optimizer outbox, SSE, migrations | import Optuna, run benchmark work on the event loop |
 | `lab_optimizer` | supervised Optuna process, durable request client, study reconciliation | touch the controller DB directly or execute engines |
-| `lab_worker` | enrollment, heartbeat/inventory upload, polling, lease ack/complete, simulated executor | trust inbound commands, fabricate real metrics |
+| `lab_worker` | enrollment, hardware/engine/model discovery, heartbeat/inventory, polling, lease ack/renew/complete, sandboxed process runner, GPU UUID leases, journal recovery, real or simulated executor | trust inbound commands, fabricate real metrics, modify installed models/engines, kill unowned processes |
 
 Contract source of truth: `lab_core` modules and FastAPI routes. Committed
 generated artifacts: `contracts/openapi.json`, `contracts/contracts.schema.json`,
@@ -85,8 +92,9 @@ worker or optimizer network call. SQLite connections set `journal_mode=WAL`,
 No synchronous worker RPC, binary probe or model read occurs in this route.
 Staleness reasons include `NO_WORKER_HEARTBEAT`, `WORKER_OFFLINE`, `NO_SNAPSHOT`,
 `SNAPSHOT_STALE`, `SNAPSHOT_REVISION_MISMATCH` and `WORKER_DISABLED`.
-The plan response carries a `PHASE_1_SIMULATED_EXECUTION` warning while the
-controller is in simulated mode.
+The plan response carries a `PHASE_1_SIMULATED_EXECUTION` warning in simulated
+mode and `MODEL_HASHES_INCOMPLETE` when the snapshot lacks strong model hashes.
+Real-mode planning still reads cached inventory only.
 
 ## 5. Worker command protocol
 
@@ -98,6 +106,7 @@ POST /api/v1/workers/{id}/snapshot             inventory revision
 POST /api/v1/workers/{id}/heartbeat
 POST /api/v1/workers/{id}/commands/poll
 POST /api/v1/workers/{id}/commands/{cid}/ack
+POST /api/v1/workers/{id}/commands/{cid}/renew
 POST /api/v1/workers/{id}/commands/{cid}/complete
 ```
 
@@ -121,9 +130,14 @@ pending ──poll──▶ leased ──ack──▶ acknowledged ──complet
   the attempt limit. A worker cannot complete a command it does not own.
 - Controller-side lease expiry is reconciled by the runtime scheduler; a lease
   timeout alone does not authorize taking over a live engine.
+- A running worker renews its lease with the same token and generation. The
+  controller caps the expiry at `worker_lease_max_seconds`; renewal never changes
+  the lease generation.
 
-The Phase 1 simulated executor handles all command types and emits deterministic
-observations with `simulated=true`. The real runner is Phase 2.
+The simulated executor handles all command types and emits deterministic
+observations with `simulated=true`. The real executor handles `SCAN`,
+`PREFLIGHT`, `CLAIM_TRIAL`, `PAUSE`, `CANCEL`, `VERIFY_RECIPE` and dry-run
+`PROMOTE`; promotion remains operator-owned.
 
 ## 6. Optimizer protocol
 
@@ -212,12 +226,45 @@ Recovery rules:
   before issuing new suggestions;
 - no silent double trial issuance, no fabricated zero-throughput OOM value.
 
-## 11. Phase boundary
+## 11. Real worker discovery and execution (Phase 2)
 
-Phase 1 intentionally proves protocol, persistence, planning, lifecycle,
-recovery and pure-adapter behavior. It does **not** prove real engine
-performance, full-context VRAM feasibility, quality or recipe validity.
+- **Engine discovery** executes only the configured `--version`/`--help` probes,
+  records SHA-256 for every binary, and parses capabilities through the pure
+  adapter. A changed binary invalidates a command plan instead of silently
+  running it.
+- **Model discovery** reads GGUF headers and Strata pack manifests under
+  operator-approved roots. SHA-256 hashing uses a persistent `(size, mtime_ns)`
+  cache; nothing under a model root is written.
+- **Hardware discovery** uses `/proc`, `psutil` and `nvidia-smi`; it records GPU
+  UUID, PCI bus, driver, VRAM, utilization, temperature and external contaminant
+  processes. It never terminates a process it does not own.
+- **Execution** uses argv arrays, a sanitized environment, a per-command
+  sandbox, an owned process group and verified executable hashes. Server
+  readiness can be an HTTP check; cancellation and timeout terminate only the
+  recorded process group.
+- **GPU leases** are advisory `flock` files addressed by GPU UUID plus a JSON
+  owner record. `CUDA_VISIBLE_DEVICES` is scoped to the lease; a second worker
+  cannot acquire the same UUID.
+- **Journals** are append-only, mode 0600, and record command/lease/process
+  ownership. Recovery terminates only recorded process groups whose start time
+  still matches; interrupted commands wait for lease expiry rather than being
+  invented as complete.
+- **Preflight** for llama.cpp starts a CPU-offload (`--n-gpu-layers 0`) server at
+  the maximum requested context and reads the effective context. It proves
+  allocation at that context, not GPU residency. Strata full-context proof is
+  deferred until the Phase 4 serving harness; the installed build lacks
+  calibration commands, so the result is explicitly `inconclusive`, never
+  fabricated.
+- **Trials** collect native `llama-bench` evidence where available and a
+  streaming OpenAI-compatible serving measurement. Missing metrics remain
+  missing; a native-only run is `screening_only`. Observations always carry
+  `simulated=false` on the real lane.
 
-Phase 2 must add the worker-owned native process runner, GPU leases, real
-llama.cpp/Strata probes and evidence upload, then Phase 4/5 the corpus,
-statistics and validated recipes. See `docs/PHASE_2_BACKLOG.md`.
+## 12. Phase boundary
+
+Phases 0/1 prove protocol, persistence, planning, lifecycle, recovery and
+pure-adapter behavior. Phase 2 proves the worker-owned process, discovery, GPU
+lease and command execution machinery. It does **not** yet prove real
+llama.cpp/Strata performance, quality, statistical finalization or validated
+recipes. Phase 3 productionizes both adapters; Phase 4 adds benchmark lanes and
+evidence; Phase 5 adds search/finalization; Phase 6 adds the UI.

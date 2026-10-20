@@ -1,0 +1,49 @@
+[Unit]
+Description=AI Inference Optimization Lab real Linux worker
+Documentation=file:/opt/ai-inference-lab/docs/ARCHITECTURE.md
+After=network-online.target lab-controller.service
+Wants=network-online.target lab-controller.service
+
+[Service]
+Type=simple
+User=ailab
+Group=ailab
+# GPU access. Adjust the device list for the host; never run the worker as root.
+SupplementaryGroups=video render
+EnvironmentFile=/etc/ai-inference-lab/lab.env
+Environment=PYTHONUNBUFFERED=1
+Environment=LAB_EXECUTION_MODE=real
+Environment=LAB_WORKER_SIMULATED=false
+ExecStart=/opt/ai-inference-lab/.venv/bin/lab-worker
+Restart=on-failure
+RestartSec=10s
+# Allow the worker to terminate only its own process groups and flush journals.
+TimeoutStopSec=90s
+KillMode=mixed
+StateDirectory=ai-inference-lab
+LogsDirectory=ai-inference-lab
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=no
+DeviceAllow=/dev/nvidiactl rw
+DeviceAllow=/dev/nvidia-uvm rw
+DeviceAllow=/dev/nvidia-uvm-tools rw
+DeviceAllow=/dev/nvidia0 rw
+DeviceAllow=char-drm rw
+ProtectSystem=strict
+# Model roots under /home remain readable but are never writable by this unit.
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/ai-inference-lab /var/log/ai-inference-lab
+LimitNOFILE=65536
+# Optional per-user GPU NUMA tuning is host-specific and intentionally omitted.
+
+[Install]
+WantedBy=multi-user.target

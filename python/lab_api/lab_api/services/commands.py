@@ -270,6 +270,36 @@ def ack_command(
     return row
 
 
+def renew_command_lease(
+    session: Session,
+    settings: Settings,
+    *,
+    worker_id: str,
+    command_id: str,
+    lease_token: str,
+    lease_generation: int,
+    extend_seconds: int,
+) -> WorkerCommandRow:
+    row = session.get(WorkerCommandRow, command_id)
+    if row is None or row.worker_id != worker_id:
+        raise NotFoundError("command not found for this worker")
+    if row.status in {
+        CommandStatus.COMPLETED.value,
+        CommandStatus.FAILED.value,
+        CommandStatus.REJECTED.value,
+        CommandStatus.EXPIRED.value,
+        CommandStatus.CANCELLED.value,
+    }:
+        raise ConflictError("command is already terminal", details={"status": row.status})
+    _verify_lease(row, lease_token, lease_generation)
+    now = utcnow()
+    extension = max(settings.worker_lease_seconds, min(extend_seconds, settings.worker_lease_max_seconds))
+    row.lease_expires_at = now + timedelta(seconds=extension)
+    row.updated_at = now
+    session.commit()
+    return row
+
+
 def complete_command(
     session: Session,
     settings: Settings,

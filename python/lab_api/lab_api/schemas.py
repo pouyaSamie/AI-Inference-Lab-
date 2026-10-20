@@ -29,6 +29,7 @@ from lab_core import (
     Objective,
     OptimizerHealth,
     PlanStatus,
+    PositiveInt,
     RecipeMode,
     ResourceConstraints,
     SearchDepth,
@@ -154,6 +155,19 @@ class HeartbeatRequest(FrozenModel):
     active_leases: tuple[str, ...] = ()
     owned_pids: tuple[int, ...] = ()
     snapshot_revision: NonNegativeInt | None = None
+
+
+class LeaseRenewRequest(FrozenModel):
+    lease_token: NonEmptyStr
+    lease_generation: PositiveInt
+    extend_seconds: int = Field(default=120, ge=5, le=3600)
+
+
+class LeaseRenewResponse(FrozenModel):
+    command_id: Identifier
+    lease_generation: PositiveInt
+    lease_expires_at: AwareTimestamp
+    server_time: AwareTimestamp
 
 
 class HeartbeatResponse(FrozenModel):

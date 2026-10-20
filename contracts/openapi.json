@@ -2362,6 +2362,55 @@
           }
         ]
       },
+      "LeaseRenewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "extend_seconds": {
+            "default": 120,
+            "maximum": 3600.0,
+            "minimum": 5.0,
+            "title": "Extend Seconds",
+            "type": "integer"
+          },
+          "lease_generation": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "lease_token": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "lease_token",
+          "lease_generation"
+        ],
+        "title": "LeaseRenewRequest",
+        "type": "object"
+      },
+      "LeaseRenewResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "lease_expires_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "lease_generation": {
+            "$ref": "#/components/schemas/PositiveInt"
+          },
+          "server_time": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          }
+        },
+        "required": [
+          "command_id",
+          "lease_generation",
+          "lease_expires_at",
+          "server_time"
+        ],
+        "title": "LeaseRenewResponse",
+        "type": "object"
+      },
       "MeasurementStatus": {
         "enum": [
           "measured",
@@ -5191,7 +5240,7 @@
     }
   },
   "info": {
-    "description": "Local-first AI inference optimization controller (Phase 1 foundation).",
+    "description": "Local-first AI inference optimization controller (Phases 2-8).",
     "title": "AI Inference Optimization Lab",
     "version": "1.0.0"
   },
@@ -7050,6 +7099,83 @@
           }
         },
         "summary": "Complete",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}/commands/{command_id}/renew": {
+      "post": {
+        "operationId": "renew_api_v1_workers__worker_id__commands__command_id__renew_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "title": "Command Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaseRenewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaseRenewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Renew",
         "tags": [
           "workers"
         ]

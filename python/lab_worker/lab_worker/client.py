@@ -23,6 +23,7 @@ from lab_core import (
 )
 
 from .config import WorkerSettings
+from .hardware import collect_hardware
 from .inventory import build_hardware
 
 logger = logging.getLogger(__name__)
@@ -120,11 +121,14 @@ class WorkerClient:
             protocol_version=self.settings.protocol_version,
             platform="linux",
             enrolled_at=utcnow(),
-            roles=("benchmark", "simulated"),
+            roles=("benchmark", "simulated" if self.settings.simulated else "real"),
+        )
+        hardware = (
+            build_hardware(self.settings) if self.settings.simulated else collect_hardware(self.settings)
         )
         body = {
             "worker": identity.model_dump(mode="json"),
-            "hardware": build_hardware(self.settings).model_dump(mode="json"),
+            "hardware": hardware.model_dump(mode="json"),
         }
         response = self._request(
             "POST",
@@ -146,16 +150,18 @@ class WorkerClient:
         )
         return cast(dict[str, Any], response.json())
 
-    def heartbeat(self, snapshot_revision: int) -> dict[str, Any]:
-        body = {
-            "health": WorkerHealth(
+    def heartbeat(self, snapshot_revision: int, health: WorkerHealth | None = None) -> dict[str, Any]:
+        if health is None:
+            health = WorkerHealth(
                 status="online",
                 last_heartbeat_at=utcnow(),
                 active_leases=(),
                 owned_pids=(),
                 isolated=True,
                 warnings=("PHASE_1_SIMULATED_EXECUTION",),
-            ).model_dump(mode="json"),
+            )
+        body = {
+            "health": health.model_dump(mode="json"),
             "snapshot_revision": snapshot_revision,
         }
         response = self._request(
@@ -165,26 +171,53 @@ class WorkerClient:
         )
         return cast(dict[str, Any], response.json())
 
-    def poll(self) -> WorkerPollResponse:
+    def poll(self, *, max_commands: int | None = None) -> WorkerPollResponse:
         response = self._request(
             "POST",
             f"/api/v1/workers/{self.settings.worker_id}/commands/poll",
-            json={"max_commands": self.settings.max_commands},
+            json={"max_commands": max_commands or self.settings.max_commands},
         )
         return WorkerPollResponse.model_validate(response.json())
 
-    def ack(self, *, command_id: str, lease_token: str, lease_generation: int) -> None:
+    def ack(
+        self,
+        *,
+        command_id: str,
+        lease_token: str,
+        lease_generation: int,
+        message: str = "worker accepted command",
+    ) -> None:
         body = CommandAck(
             lease_token=lease_token,
             disposition=AckDisposition.ACCEPTED,
             lease_generation=lease_generation,
-            message="simulated worker accepted command",
+            message=message,
         )
         self._request(
             "POST",
             f"/api/v1/workers/{self.settings.worker_id}/commands/{command_id}/ack",
             json=body.model_dump(mode="json"),
         )
+
+    def renew(
+        self,
+        *,
+        command_id: str,
+        lease_token: str,
+        lease_generation: int,
+        extend_seconds: int = 120,
+    ) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            f"/api/v1/workers/{self.settings.worker_id}/commands/{command_id}/renew",
+            json={
+                "lease_token": lease_token,
+                "lease_generation": lease_generation,
+                "extend_seconds": extend_seconds,
+            },
+            max_retries=2,
+        )
+        return cast(dict[str, Any], response.json())
 
     def complete(self, *, command_id: str, completion: CommandCompletion) -> dict[str, Any]:
         response = self._request(

@@ -153,7 +153,7 @@ class ExecutionPlan(FrozenModel):
             self.candidate_digest,
             [stage.command.model_dump(mode="json") for stage in self.stages],
             self.sandbox.model_dump(mode="json"),
-            [item.sha256 for item in self.generated_files],
+            [(item.relative_path, item.sha256) for item in self.generated_files],
         )
         if self.plan_id and self.plan_id != expected:
             raise ValueError("plan_id does not match execution plan contents")
@@ -168,6 +168,7 @@ class ServerExecutionPlan(FrozenModel):
     candidate_digest: Sha256
     sandbox: SandboxPaths
     start: ExecutionStage
+    generated_files: tuple[GeneratedFile, ...] = ()
     bind_host: str = "127.0.0.1"
     port_range_start: PositiveInt
     port_range_end: PositiveInt
@@ -188,6 +189,7 @@ class ServerExecutionPlan(FrozenModel):
             self.candidate_digest,
             self.start.command.model_dump(mode="json"),
             self.sandbox.model_dump(mode="json"),
+            [(item.relative_path, item.sha256) for item in self.generated_files],
             self.bind_host,
             self.port_range_start,
             self.port_range_end,

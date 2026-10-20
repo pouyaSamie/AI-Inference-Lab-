@@ -1,6 +1,6 @@
 # AGENTS.md — working rules for this repository
 
-This repository is the Phase 0/1 foundation of **AI Inference Optimization Lab**.
+This repository is the Phase 0/1/2 foundation of **AI Inference Optimization Lab**.
 The authoritative product contract is [`docs/prd.md`](docs/prd.md) (PRD v2.1).
 When code and prose disagree, the PRD and the frozen `lab_core` models win.
 
@@ -10,23 +10,28 @@ Implemented now:
 
 - local Python 3.12+ `uv` workspace with six packages;
 - persistent FastAPI controller, SQLAlchemy 2.x, Alembic, SQLite WAL;
-- frozen Pydantic v2 contracts in `lab_core`;
+- frozen Pydantic v2 contracts in `lab_core`, including execution plans;
 - independently supervised Optuna process (`lab_optimizer`) using its own SQLite store;
-- durable worker command queue with outbound polling, leases, acks and idempotent completions;
+- durable worker command queue with outbound polling, leases, renewal, acks and idempotent completions;
 - pure `llamacpp` and `strata` adapter translators/parsers;
+- real Linux worker: observed engine/model discovery, SHA-256 hash cache, hardware telemetry, sandboxes, journal, GPU UUID `flock` leases, argv-only process runner, crash recovery and real executor;
+- explicit **simulated** worker executor and end-to-end tests;
 - deterministic OpenAPI/JSON-Schema/TypeScript contract generation;
-- explicit **simulated** worker executor and end-to-end tests.
+- systemd unit files and deployment documentation (authoring only, not installed).
 
-Intentionally deferred: real engine execution, GPU leases, process supervision,
-tokenizer-backed benchmark corpora, statistical finalization, recipes from real
-evidence, Electron/React UI, release intelligence and systemd packaging.
+Intentionally deferred: tokenizer-backed benchmark corpora, statistical
+finalization, recipes from real evidence, Electron/React UI, release
+intelligence and production systemd installation. Strata full-context proof is
+deferred to Phase 4 because the installed build lacks calibration commands.
 
 ## Non-negotiable invariants
 
-1. **Phase 1 never executes a real engine.** `lab-worker` and `lab-worker-sim`
-   run the simulation lane. Every simulated observation has `simulated=true`
-   and `measurement_status=simulated`. Simulated evidence can never produce a
-   validated recipe; `POST /api/v1/recipes` must return `409`.
+1. **The lanes never blur.** `lab-worker-sim` never launches a real engine and
+   emits only `simulated=true` / `measurement_status=simulated` observations.
+   `lab-worker` is the real lane and emits only `simulated=false` observations.
+   Simulated evidence can never produce a validated recipe;
+   `POST /api/v1/recipes` must return `409` for it. Real evidence that is
+   `screening_only` or missing required metrics cannot qualify a recipe either.
 2. **Never run Optuna in FastAPI.** `lab_api` writes durable optimizer requests
    to the controller store. `lab_optimizer` owns `study.ask/tell`, Optuna
    `RDBStorage` and its own database. No controller module may import Optuna.
@@ -62,10 +67,11 @@ uv sync --all-packages
 # controller schema
 uv run --env-file .env alembic upgrade head
 
-# run components (three terminals; no desktop/GPU required)
+# run components (three terminals)
 uv run --env-file .env lab-api
 uv run --env-file .env lab-optimizer
-uv run --env-file .env lab-worker-sim
+uv run --env-file .env lab-worker        # real lane; requires installed engines/models
+# uv run --env-file .env lab-worker-sim  # explicit simulation lane
 
 # verification
 uv run ruff check
@@ -89,7 +95,8 @@ work offline and must not start an HTTP listener. CI must fail on drift.
 - `python/lab_adapters` — pure engine adapters and conformance fixtures.
 - `python/lab_api` — FastAPI app, auth, persistence, queues, SSE, Alembic.
 - `python/lab_optimizer` — supervised Optuna process and internal client.
-- `python/lab_worker` — worker protocol client and explicit simulation.
+- `python/lab_worker` — real worker discovery/execution plus explicit simulation.
+- `packaging/systemd` — unit definitions and deployment notes (not installed).
 - `contracts/` — committed generated OpenAPI/JSON Schema/manifest.
 - `packages/client-contracts` — generated TypeScript declarations.
 - `tests/` — offline unit/integration/resilience/contract tests.
@@ -116,5 +123,10 @@ work offline and must not start an HTTP listener. CI must fail on drift.
 - Bearer tokens only; worker enrollment uses a separate enrollment credential.
 - Worker tokens are stored as a peppered SHA-256 hash; plaintext is returned
   once at registration.
+- The real worker never terminates unowned processes, never writes under model
+  or engine roots, and never downloads or replaces binaries.
+- Long-running command leases are renewed with the same token and generation;
+  a lease timeout alone never authorizes taking over a live engine.
 - SSE uses a stateless operator check because the stream is long-lived.
 - Do not log secrets, model prompts or full environment dumps.
+- Do not install or enable the systemd units without explicit operator approval.

@@ -19,6 +19,8 @@ from ..schemas import (
     CompletionResponse,
     HeartbeatRequest,
     HeartbeatResponse,
+    LeaseRenewRequest,
+    LeaseRenewResponse,
     PollRequest,
     WorkerListResponse,
     WorkerRegistrationRequest,
@@ -28,7 +30,13 @@ from ..schemas import (
     WorkerView,
 )
 from ..security import Principal, require_enrollment, require_operator, require_worker
-from ..services.commands import ack_command, command_status_view, complete_command, poll_commands
+from ..services.commands import (
+    ack_command,
+    command_status_view,
+    complete_command,
+    poll_commands,
+    renew_command_lease,
+)
 from ..services.inventory import (
     heartbeat,
     list_worker_summaries,
@@ -177,6 +185,37 @@ def ack(
     _assert_worker(principal, worker_id)
     row = ack_command(session, settings, worker_id=worker_id, command_id=command_id, ack=body)
     return AckResponse(command_id=row.command_id, status=row.status, lease_generation=row.lease_generation)
+
+
+@router.post(
+    "/api/v1/workers/{worker_id}/commands/{command_id}/renew",
+    response_model=LeaseRenewResponse,
+)
+def renew(
+    worker_id: str,
+    command_id: str,
+    body: LeaseRenewRequest,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    principal: Principal = Depends(require_worker),
+) -> LeaseRenewResponse:
+    _assert_worker(principal, worker_id)
+    row = renew_command_lease(
+        session,
+        settings,
+        worker_id=worker_id,
+        command_id=command_id,
+        lease_token=body.lease_token,
+        lease_generation=body.lease_generation,
+        extend_seconds=body.extend_seconds,
+    )
+    assert row.lease_expires_at is not None
+    return LeaseRenewResponse(
+        command_id=row.command_id,
+        lease_generation=row.lease_generation,
+        lease_expires_at=row.lease_expires_at,
+        server_time=utcnow(),
+    )
 
 
 @router.post(

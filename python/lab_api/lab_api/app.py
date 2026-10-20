@@ -66,10 +66,6 @@ def create_app(
     engine: Engine | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
-    if settings.execution_mode == "real":
-        raise ValueError(
-            "real execution is not implemented in Phase 1; configure LAB_EXECUTION_MODE=simulated"
-        )
     _configure_logging(settings.log_level)
     owned_engine = engine is None and session_factory is None
     engine = engine or (None if session_factory is not None else create_controller_engine(settings))
@@ -97,7 +93,7 @@ def create_app(
     app = FastAPI(
         title="AI Inference Optimization Lab",
         version=SCHEMA_VERSION,
-        description="Local-first AI inference optimization controller (Phase 1 foundation).",
+        description="Local-first AI inference optimization controller (Phases 2-8).",
         lifespan=lifespan,
         docs_url="/docs" if settings.document_openapi else None,
         redoc_url=None,

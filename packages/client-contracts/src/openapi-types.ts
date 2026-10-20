@@ -398,6 +398,17 @@ export interface components {
     "JobStage": "queued" | "preflight" | "baseline" | "screening" | "refinement" | "finalist_validation" | "report" | "completed";
     "JobState": "queued" | "preflight_required" | "preflighting" | "ready" | "running" | "paused" | "cancelling" | "cancelled" | "completed" | "failed" | "blocked";
     "JsonScalar": string | number | boolean | null;
+    "LeaseRenewRequest": {
+      "extend_seconds"?: number;
+      "lease_generation": components["schemas"]["PositiveInt"];
+      "lease_token": components["schemas"]["NonEmptyStr"];
+    };
+    "LeaseRenewResponse": {
+      "command_id": components["schemas"]["Identifier"];
+      "lease_expires_at": components["schemas"]["AwareTimestamp"];
+      "lease_generation": components["schemas"]["PositiveInt"];
+      "server_time": components["schemas"]["AwareTimestamp"];
+    };
     "MeasurementStatus": "measured" | "estimated" | "unavailable" | "invalid" | "infeasible" | "screening_only" | "simulated";
     "ModelArtifact": {
       "architecture": components["schemas"]["NonEmptyStr"];
@@ -1252,6 +1263,19 @@ export interface operations {
     "422": components["schemas"]["HTTPValidationError"];
   };
   };
+  "renew_api_v1_workers__worker_id__commands__command_id__renew_post": {
+    method: "POST";
+    parameters: {
+      "worker_id": string;
+      "command_id": string;
+      "authorization"?: string | null;
+    };
+    requestBody: components["schemas"]["LeaseRenewRequest"];
+    responses: {
+    "200": components["schemas"]["LeaseRenewResponse"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
   "worker_heartbeat_api_v1_workers__worker_id__heartbeat_post": {
     method: "POST";
     parameters: {
@@ -1377,6 +1401,9 @@ export interface paths {
   };
   "/api/v1/workers/{worker_id}/commands/{command_id}/complete": {
     post: operations["complete_api_v1_workers__worker_id__commands__command_id__complete_post"];
+  };
+  "/api/v1/workers/{worker_id}/commands/{command_id}/renew": {
+    post: operations["renew_api_v1_workers__worker_id__commands__command_id__renew_post"];
   };
   "/api/v1/workers/{worker_id}/heartbeat": {
     post: operations["worker_heartbeat_api_v1_workers__worker_id__heartbeat_post"];

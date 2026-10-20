@@ -124,7 +124,7 @@ class StrataAdapter(InferenceAdapter):
         self, outputs: tuple[ProcessOutput, ...], binary: RegisteredBinary
     ) -> EngineCapabilityManifest:
         version_text = "\n".join(output.stdout + "\n" + output.stderr for output in outputs)
-        help_text = "\n".join(output.stdout for output in outputs)
+        help_text = "\n".join(output.stdout + "\n" + output.stderr for output in outputs)
         match = _VERSION_RE.search(version_text)
         if not match:
             raise ValueError("could not parse `strata --version`; refusing to guess capabilities")
@@ -339,7 +339,9 @@ class StrataAdapter(InferenceAdapter):
             },
         )
 
-    def _profile(self, candidate: CandidateSpec, model: ModelArtifact) -> dict[str, object]:
+    def _profile(
+        self, candidate: CandidateSpec, model: ModelArtifact, *, cwd: str = "."
+    ) -> dict[str, object]:
         pack_path = model.metadata.get("pack_path")
         engine_executable = model.metadata.get("engine_executable")
         tokenizer = model.metadata.get("tokenizer_path")
@@ -382,7 +384,7 @@ class StrataAdapter(InferenceAdapter):
         profile: dict[str, object] = {
             "exe": engine_executable,
             "args": args,
-            "cwd": model.metadata.get("cwd") or ".",
+            "cwd": cwd,
             "model_name": model.metadata.get("model_name") or model.model_id,
             "gpu": _int(params, "gpu", 0),
             "lib_dirs": model.metadata.get("lib_dirs", []),
@@ -403,7 +405,7 @@ class StrataAdapter(InferenceAdapter):
         server_script = model.metadata.get("server_script")
         if not isinstance(server_script, str):
             raise ValueError("Strata model metadata must include the observed server_script path")
-        profile = self._profile(candidate, model)
+        profile = self._profile(candidate, model, cwd=sandbox.work_dir)
         content = json.dumps(profile, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
         profile_file = GeneratedFile(relative_path="strata-profile.json", content=content)
         profile_path = f"{sandbox.work_dir.rstrip('/')}/{profile_file.relative_path}"
@@ -433,6 +435,7 @@ class StrataAdapter(InferenceAdapter):
             candidate_digest=candidate.semantic_key(),
             sandbox=sandbox,
             start=ExecutionStage(name="strata-server", command=command),
+            generated_files=(profile_file,),
             bind_host="127.0.0.1",
             port_range_start=port,
             port_range_end=port,

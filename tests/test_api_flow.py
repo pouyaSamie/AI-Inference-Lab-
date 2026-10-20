@@ -206,9 +206,9 @@ def test_stale_snapshot_returns_typed_preflight_required(controller: ControllerH
     assert "WORKER_OFFLINE" in body["reason"]
 
 
-def test_execution_mode_rejects_real_mode_startup(settings) -> None:
+def test_execution_mode_accepts_real_mode_startup(settings) -> None:
     from lab_api.app import create_app
 
     real = settings.model_copy(update={"execution_mode": "real"})
-    with pytest.raises(ValueError, match="real execution"):
-        create_app(real)
+    app = create_app(real)
+    assert app.state.settings.execution_mode == "real"

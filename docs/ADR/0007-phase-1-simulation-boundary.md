@@ -1,6 +1,6 @@
 # ADR 0007: Phase 1 execution is explicitly simulated
 
-Status: accepted (Phase 1)
+Status: accepted (Phase 1); the simulated lane remains binding. The statement that `execution_mode=real` is rejected was superseded by ADR 0011 in Phase 2.
 
 ## Context
 

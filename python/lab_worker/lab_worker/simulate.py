@@ -52,6 +52,8 @@ def settings_from_args(args: argparse.Namespace) -> WorkerSettings:
         value = getattr(args, arg)
         if value is not None:
             values[field] = value
+    values["simulated"] = True
+    values["execution_mode"] = "simulated"
     return WorkerSettings.model_validate(values)
 
 

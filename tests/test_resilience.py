@@ -163,3 +163,43 @@ def test_wrong_worker_cannot_complete_command(controller: ControllerHandle, tmp_
                 )
     finally:
         worker.client.close()
+
+
+def test_lease_renewal_extends_same_generation_and_rejects_bad_token(
+    controller: ControllerHandle, tmp_path
+) -> None:
+    worker = _worker(controller, tmp_path, "sim-renew")
+    try:
+        with controller.session_factory() as session:
+            row = enqueue_command(
+                session,
+                controller.settings,
+                worker_id="sim-renew",
+                command_type=CommandType.SCAN,
+                payload=ScanPayload(roots=("/home/pouya/ai-lab/models",), reason="renew test"),
+                idempotency_key="renew-test-scan",
+            )
+            session.commit()
+            command_id = row.command_id
+        polled = worker.client.poll()
+        assert len(polled.leases) == 1
+        lease = polled.leases[0]
+        before = lease.lease_expires_at
+        renewed = worker.client.renew(
+            command_id=command_id,
+            lease_token=lease.lease_token,
+            lease_generation=lease.lease_generation,
+            extend_seconds=300,
+        )
+        assert renewed["lease_generation"] == lease.lease_generation
+        assert renewed["command_id"] == command_id
+        assert renewed["lease_expires_at"] != before.isoformat()
+        with pytest.raises(Exception, match="409"):
+            worker.client.renew(
+                command_id=command_id,
+                lease_token="wrong-token",
+                lease_generation=lease.lease_generation,
+                extend_seconds=300,
+            )
+    finally:
+        worker.client.close()
