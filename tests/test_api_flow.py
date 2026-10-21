@@ -81,6 +81,14 @@ def test_plan_create_optimize_and_reject_simulated_recipe(
         assert all(item["repetitions"] == 3 for item in view["observations"])
         assert all(len(item["samples"]) == 3 for item in view["observations"])
 
+        snapshot = client.get("/api/v1/workers/sim-test/snapshot")
+        assert snapshot.status_code == 200, snapshot.text
+        assert snapshot.json()["worker_id"] == "sim-test"
+        assert snapshot.json()["engines"]
+        assert snapshot.json()["models"]
+        missing = client.get("/api/v1/workers/missing-worker/snapshot")
+        assert missing.status_code == 404
+
         results = client.get(f"/api/v1/experiments/{experiment_id}/results")
         assert results.status_code == 200, results.text
         result_body = results.json()

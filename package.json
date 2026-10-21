@@ -3,8 +3,14 @@
   "private": true,
   "packageManager": "pnpm@10.18.3",
   "scripts": {
-    "typecheck": "pnpm --filter @lab/client-contracts typecheck",
+    "typecheck": "pnpm --filter @lab/client-contracts typecheck && npm --prefix apps/desktop run typecheck",
     "generate:contracts": "uv run python scripts/export_openapi.py && uv run python scripts/export_schemas.py && uv run python scripts/export_ts.py",
-    "contracts:check": "uv run python scripts/check_contracts.py"
+    "contracts:check": "uv run python scripts/check_contracts.py",
+    "ui:dev": "npm --prefix apps/desktop run dev",
+    "ui:typecheck": "npm --prefix apps/desktop run typecheck",
+    "ui:test": "npm --prefix apps/desktop test",
+    "ui:build": "npm --prefix apps/desktop run build",
+    "ui:package:linux": "npm --prefix apps/desktop run package:linux",
+    "ui:preview": "npm --prefix apps/desktop run preview"
   }
 }

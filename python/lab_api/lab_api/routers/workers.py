@@ -9,7 +9,7 @@ from lab_core.base import utcnow
 from lab_core.errors import AuthorizationError, NotFoundError
 from sqlalchemy.orm import Session
 
-from lab_core import CommandAck, CommandCompletion, WorkerPollResponse
+from lab_core import CommandAck, CommandCompletion, WorkerPollResponse, WorkerSnapshot
 
 from ..config import Settings
 from ..dependencies import get_session, get_settings
@@ -39,8 +39,10 @@ from ..services.commands import (
 )
 from ..services.inventory import (
     heartbeat,
+    latest_snapshot,
     list_worker_summaries,
     register_worker,
+    snapshot_model,
     store_snapshot,
     worker_summary,
 )
@@ -118,6 +120,21 @@ def get_worker(
         gpus=tuple(gpu.model_dump(mode="json") for gpu in item.gpus),
         warnings=item.warnings,
     )
+
+
+@router.get("/api/v1/workers/{worker_id}/snapshot", response_model=WorkerSnapshot)
+def get_worker_snapshot(
+    worker_id: str,
+    session: Session = Depends(get_session),
+    principal: Principal = Depends(require_operator),
+) -> WorkerSnapshot:
+    """Return the latest cached worker snapshot without contacting the worker."""
+    if session.get(WorkerRow, worker_id) is None:
+        raise NotFoundError("worker not found")
+    row = latest_snapshot(session, worker_id)
+    if row is None:
+        raise NotFoundError("worker has no cached snapshot")
+    return snapshot_model(row)
 
 
 @router.post("/api/v1/workers/{worker_id}/snapshot", response_model=WorkerSnapshotResponse)

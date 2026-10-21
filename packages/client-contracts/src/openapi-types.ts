@@ -1356,6 +1356,18 @@ export interface operations {
     "422": components["schemas"]["HTTPValidationError"];
   };
   };
+  "get_worker_snapshot_api_v1_workers__worker_id__snapshot_get": {
+    method: "GET";
+    parameters: {
+      "worker_id": string;
+      "authorization"?: string | null;
+    };
+    requestBody: never;
+    responses: {
+    "200": components["schemas"]["WorkerSnapshot"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
   "upload_snapshot_api_v1_workers__worker_id__snapshot_post": {
     method: "POST";
     parameters: {
@@ -1477,6 +1489,7 @@ export interface paths {
     post: operations["worker_heartbeat_api_v1_workers__worker_id__heartbeat_post"];
   };
   "/api/v1/workers/{worker_id}/snapshot": {
+    get: operations["get_worker_snapshot_api_v1_workers__worker_id__snapshot_get"];
     post: operations["upload_snapshot_api_v1_workers__worker_id__snapshot_post"];
   };
   "/health": {

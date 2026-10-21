@@ -1,4 +1,4 @@
-# Architecture — Phase 0/1 foundation, Phase 2 worker, Phase 3 adapters, Phase 4 workloads, Phase 5 finalization
+# Architecture — Phases 0–6: foundation, worker, adapters, workloads, finalization and desktop UI
 
 Status: Phase 1 is complete and verified. Phase 2 adds a production Linux worker
 with observed engine/model discovery, native process execution, GPU UUID leases,
@@ -6,14 +6,16 @@ journals, sandboxes and a real executor. Phase 3 productionizes the two adapters
 against the installed llama.cpp and Strata builds and adds offline conformance
 tests. Phase 4 adds tokenizer-backed workloads and Strata source-shard identity.
 Phase 5 adds paired baselines, retained primary samples and deterministic
-statistical finalization. The simulated lane remains separate and its evidence
-can never qualify a recipe.
+statistical finalization. Phase 6 adds the local Electron/React operator UI
+through a narrow, validated main-process bridge. The simulated lane remains
+separate and its evidence can never qualify a recipe.
 
 ## 1. Process topology
 
 ```text
-operator / browser / future Electron UI
+operator / Electron renderer / optional browser companion
         │  HTTP + Bearer + SSE (loopback in local mode)
+        │  Electron: renderer → validated IPC → main-process proxy
         ▼
 ┌──────────────────────────────────────────────┐
 │ FastAPI controller (lab_api)                 │
@@ -355,7 +357,80 @@ Recovery rules:
   the finalization path is verified offline only. Simulation still produces a
   `SIMULATED` classification and no validated recipe.
 
-## 15. Phase boundary
+## 15. Desktop operator UI (Phase 6)
+
+The desktop application lives in `apps/desktop`. It is a Linux-first Electron
+shell with a React/Vite renderer and a narrow preload bridge. It is a **view and
+operator-control surface**, not a second controller:
+
+- the renderer never launches an engine, worker, optimizer or benchmark job and
+  never owns durable experiment state;
+- the controller remains the only planning, scheduling, finalization and recipe
+  qualification authority;
+- closing the window closes only UI/IPC/SSE connections; durable jobs continue.
+
+### Process and transport boundary
+
+```text
+React renderer (sandboxed, no Node, no token)
+        │ preload contextBridge
+        ▼
+Electron main process
+  settings (safeStorage; no plaintext token)
+  validated /api/v1 HTTP proxy (Bearer attached only here)
+  SSE bridge (reconnect + Last-Event-ID)
+        │ HTTP + Bearer + SSE
+        ▼
+FastAPI controller
+```
+
+- Packaged renderer assets are served through the privileged `lab://app`
+  protocol. The handler serves only files beneath the packaged `dist` directory,
+  rejects traversal and unknown hosts, and sends a strict CSP with
+  `connect-src 'none'`.
+- Development uses only a loopback Vite origin (`127.0.0.1` or `localhost`) with
+  a separate CSP that permits HMR. `file://` is never a production path.
+- The preload exposes `appInfo`, settings status/storage, validated API request,
+  SSE subscribe/unsubscribe and native report save. It does not expose Node,
+  filesystem or general network APIs.
+- The API proxy accepts only `GET`/`POST` paths under `/api/v1/`, rejects
+  traversal and encoded traversal, caps bodies and responses, and uses
+  `redirect: "error"`. The bearer token never crosses into the renderer.
+- BrowserWindow uses `contextIsolation`, `sandbox`, `webSecurity`, no Node
+  integration, no webviews, denied permissions and blocked foreign navigation.
+- A system tray, when available, hides/reopens the window or quits the UI. It
+  never owns a job; controller-owned work continues while the window is hidden.
+
+### UI truthfulness
+
+- Demo mode is an explicit offline fixture client selected by `?demo=1` or a
+  stored UI preference. Every screen remains labelled `OFFLINE DEMO MODE`; the
+  fixtures cannot create, cancel or qualify real evidence.
+- Compare renders `VALIDATED_WINNER`, `NO_VALIDATED_WINNER` and `SIMULATED`
+  directly from controller data, including paired intervals, per-context
+  winners, incomplete coverage and ineligibility reasons. Highest throughput is
+  never shown as a winner by itself.
+- Optimize renders fresh/stale inventory, preflight blockers, the six-step
+  immutable plan and the selected worker/GPU/contexts. It submits through the
+  existing planning/experiment endpoints.
+- Updates states that release intelligence is not implemented and never
+  downloads, replaces or installs an engine or model.
+- Hardware acceleration is disabled before ready by default.
+  `LAB_DESKTOP_ENABLE_GPU=1` is an explicit operator override; it requires a
+  restart and any shared-GPU qualification then requires contamination
+  verification.
+
+### Packaging boundary
+
+`apps/desktop/scripts/package-linux.mjs` builds a Debian package from the
+installed Electron distribution and compiled renderer/main assets without
+downloading anything. It sets `chrome-sandbox` to root-owned mode 4755 and
+installs an application launcher, desktop entry and icon. Building the `.deb`
+is verified; installation, signing, upgrade/rollback and AppImage packaging
+remain Phase 8 release-hardening work requiring approval. A packaged build is
+not benchmark evidence.
+
+## 16. Phase boundary
 
 Phases 0/1 prove protocol, persistence, planning, lifecycle, recovery and
 pure-adapter behavior. Phase 2 proves the worker-owned process, discovery, GPU
@@ -363,6 +438,7 @@ lease and command execution machinery. Phase 3 proves adapter conformance
 against the installed help/version/evidence fixtures and the observed live
 surface. Phase 4 adds tokenizer-backed workload lanes and read-only Strata
 source-shard identity. Phase 5 adds paired baselines, retained samples,
-statistical finalization and the recipe qualification gate; it does **not**
-prove real llama.cpp/Strata performance or create a real validated recipe until
-an approved run produces evidence. Phase 6 adds the UI.
+statistical finalization and the recipe qualification gate. Phase 6 adds the
+secure desktop operator UI and a locally built `.deb`. None of these offline
+checks prove real llama.cpp/Strata performance or create a real validated recipe
+without an approved live run. Release intelligence remains deferred.

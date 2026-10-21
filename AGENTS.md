@@ -1,6 +1,6 @@
 # AGENTS.md — working rules for this repository
 
-This repository is the Phase 0/1/2/3/4/5 foundation of **AI Inference Optimization Lab**.
+This repository is the Phase 0/1/2/3/4/5/6 foundation of **AI Inference Optimization Lab**.
 The authoritative product contract is [`docs/prd.md`](docs/prd.md) (PRD v2.1).
 When code and prose disagree, the PRD and the frozen `lab_core` models win.
 
@@ -22,12 +22,22 @@ Implemented now:
 - deterministic finalization with paired percentile bootstrap, per-context winners, complete-coverage cross-context ranking and the >=5% / 95% recipe gate;
 - explicit **simulated** worker executor and end-to-end tests;
 - deterministic OpenAPI/JSON-Schema/TypeScript contract generation;
+- Electron/React/Vite operator UI with all ten primary screens, generated
+  contract aliases, offline demo fixtures, replayable SSE and Vitest coverage;
+- secure Electron main/preload boundary: `lab://app` + CSP, sandbox/context
+  isolation, validated IPC API/SSE proxy, safeStorage-only token persistence and
+  native bounded report save;
+- local Linux `.deb` packaging script using the installed Electron distribution
+  and `dpkg-deb` (built/inspected, not installed);
 - systemd unit files and deployment documentation (authoring only, not installed).
 
-Intentionally deferred: recipes from real evidence, Electron/React UI, release
-intelligence and production systemd installation. Strata full-context proof
+Intentionally deferred: recipes from real evidence, release intelligence,
+production systemd installation, full live GUI acceptance, AppImage packaging,
+installer signing and upgrade/rollback testing. Strata full-context proof
 remains `INCONCLUSIVE` until a real approved serving run; the installed build
-lacks calibration commands.
+lacks calibration commands. The desktop dependency graph is outside the pnpm
+workspace and has no committed lockfile yet; do not claim a clean reproducible
+desktop install until that is fixed.
 
 ## Non-negotiable invariants
 
@@ -67,7 +77,14 @@ lacks calibration commands.
     declared margin, with a confidence interval strictly above baseline and no
     guardrail failure. Missing samples or contexts make it ineligible, never a
     silent pass. Cross-context aggregation requires the complete selected set.
-11. **`attic/` is archival.** Do not import, format, modify or activate anything
+11. **The desktop UI is not the lab.** The Electron renderer never receives the
+    operator token, never launches engines/workers/optimizers and never owns
+    durable jobs. All controller traffic goes through validated main-process
+    IPC. Demo mode is visibly labelled and cannot create or qualify evidence.
+    Packaged assets use `lab://app` with strict CSP; the renderer stays
+    sandboxed and isolated. Hardware acceleration stays off unless the explicit
+    `LAB_DESKTOP_ENABLE_GPU=1` override is set and contamination is verified.
+12. **`attic/` is archival.** Do not import, format, modify or activate anything
     under `attic/`. It records an abandoned parallel draft only.
 
 ## Required commands
@@ -95,7 +112,18 @@ uv run pytest -q
 uv run python scripts/check_contracts.py
 pnpm install --frozen-lockfile
 pnpm typecheck
+
+# desktop UI (separate npm dependency graph; no lockfile is committed yet)
+npm --prefix apps/desktop test
+npm --prefix apps/desktop run build
+npm --prefix apps/desktop run package:linux
 ```
+
+`pnpm typecheck` includes the desktop renderer/Electron typecheck and therefore
+requires the desktop dependencies to be installed. A clean desktop install
+requires network access and is not currently reproducible from a committed
+lockfile. The `.deb` build uses the installed Electron distribution and performs
+no download; installation/signing/AppImage remain approval-gated.
 
 `pnpm generate:contracts` (or the three Python export scripts directly) must
 work offline and must not start an HTTP listener. CI must fail on drift.
@@ -108,17 +136,20 @@ work offline and must not start an HTTP listener. CI must fail on drift.
 - `python/lab_api` — FastAPI app, auth, persistence, queues, SSE, Alembic.
 - `python/lab_optimizer` — supervised Optuna process and internal client.
 - `python/lab_worker` — real worker discovery/execution plus explicit simulation.
+- `apps/desktop` — Electron/React/Vite operator UI, secure IPC bridge and local
+  Debian package builder. It is outside the pnpm workspace.
 - `packaging/systemd` — unit definitions and deployment notes (not installed).
 - `contracts/` — committed generated OpenAPI/JSON Schema/manifest.
 - `packages/client-contracts` — generated TypeScript declarations.
-- `tests/` — offline unit/integration/resilience/contract tests.
+- `tests/` — offline Python unit/integration/resilience/contract tests.
+- `apps/desktop/**/*.test.ts(x)` — offline UI/IPC Vitest coverage.
 - `fixtures/engines` — sanitized Phase 0 CLI/version evidence (never private data).
 - `docs/ADR` — architecture decision records.
 
 ## Working style
 
 - Keep changes inside the current phase. Do not implement later-phase engine
-  execution, UI or release workflows “while here”.
+  execution or release workflows “while here”.
 - Read the existing implementation before replacing it. Preserve user changes.
 - Prefer small, typed services and explicit state transitions over hidden
   side effects in routes.
@@ -140,5 +171,9 @@ work offline and must not start an HTTP listener. CI must fail on drift.
 - Long-running command leases are renewed with the same token and generation;
   a lease timeout alone never authorizes taking over a live engine.
 - SSE uses a stateless operator check because the stream is long-lived.
+- The Electron renderer is sandboxed with context isolation and no Node
+  integration. Do not add direct renderer network/filesystem access, weaken the
+  `lab://app` CSP, expose the bearer token or allow foreign navigation.
 - Do not log secrets, model prompts or full environment dumps.
-- Do not install or enable the systemd units without explicit operator approval.
+- Do not install or enable the systemd units, install the `.deb`, or sign and
+  publish release artifacts without explicit operator approval.

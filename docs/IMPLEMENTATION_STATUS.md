@@ -27,7 +27,8 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 | SSE | Implemented | Initial `snapshot`, sequenced events, `event.gap` for stale `Last-Event-ID`, bounded page endpoint. |
 | Generated contracts | Implemented, checked in | OpenAPI, JSON Schema/manifest and strict TypeScript declarations; offline generation and drift gate. |
 | systemd packaging | Authored, not installed | Three service units plus an environment template and security notes under `packaging/systemd/`. |
-| Electron/React UI | Not implemented | Phase 6. |
+| Electron/React UI | Implemented, verified offline | Ten primary screens, generated TypeScript contracts, offline demo fixtures, SSE replay, secure Electron main/preload, validated IPC API/SSE proxy and native report save. Unit tests, typecheck, production build and a local `.deb` build pass. No full GUI live-controller run yet. |
+| Desktop packaging | Built, not installed | `apps/desktop/scripts/package-linux.mjs` builds a `.deb` from the installed Electron distribution using `dpkg-deb`; `chrome-sandbox` is root-owned mode 4755 in the archive. Installation, signing, upgrade/rollback and AppImage remain Phase 8. |
 | Tokenizer-backed workloads | Implemented, offline | Frozen `lab-synthetic-v1` corpus, engine tokenizer fitting, prompt-level ladder, repeated-primary medians and near-capacity truncation checks. No live serving run yet. |
 | Update intelligence / release qualification | Not implemented | Phase 7/8. |
 
@@ -43,8 +44,40 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
   UUIDs, runs verified argv-only processes and completes typed evidence.
 - **`lab-worker-sim`** — explicit simulated worker with deterministic inventory
   and observations; it never launches an engine or leases a GPU.
+- **`apps/desktop`** — local Electron/React operator console. It is a view and
+  control surface only: the sandboxed renderer reaches the controller through a
+  validated main-process IPC proxy, never owns durable jobs and never receives
+  the bearer token.
 
-## 3. Real worker behavior
+## 3. Desktop UI behavior
+
+- Ten primary screens: Overview, Models, Engines, Workers, Optimize, Live Runs,
+  Compare, Recipes, Updates and Settings. They use generated contract aliases
+  rather than hand-written duplicate payload interfaces.
+- The Optimize flow renders fresh/stale inventory, worker/GPU/model/engine
+  selection, six explicit steps, preflight blockers and an immutable plan
+  submission. It does not run a worker call from planning.
+- Compare renders controller finalization, paired intervals, per-context
+  winners, incomplete coverage, `VALIDATED_WINNER`, `NO_VALIDATED_WINNER` and
+  `SIMULATED` without inferring a winner from throughput.
+- Live Runs consumes sequenced SSE with replay floors, reconnect/backoff and
+  stale-sequence resets. It does not poll an engine or process.
+- A system tray can reopen the window or quit the UI. Closing the window hides
+  it only when a tray exists; controller-owned jobs are never tied to window
+  lifetime. Minimal desktops without a tray fall back to normal exit.
+- Offline demo mode is explicit (`?demo=1` or Settings) and visibly labelled on
+  every screen. Its fixtures cannot create/cancel experiments or qualify a
+  recipe.
+- The renderer has `contextIsolation`, `sandbox`, no Node integration, no
+  webviews, denied permissions and blocked foreign navigation. Packaged assets
+  use `lab://app` with strict CSP; development uses only loopback Vite.
+- Hardware acceleration is disabled before ready. `LAB_DESKTOP_ENABLE_GPU=1` is
+  an explicit restart-requiring override; shared-GPU qualification then needs
+  contamination verification.
+- Updates is a truthful later-phase boundary: it never checks, downloads,
+  replaces or installs an engine/model.
+
+## 4. Real worker behavior
 
 ### Discovery
 
@@ -128,7 +161,7 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 - Simulated, character-fallback, screening-only, native-only and
   hash-incomplete evidence remain ineligible.
 
-## 4. Verification actually performed
+## 5. Verification actually performed
 
 The following commands were run in this workspace on 2026-10-21 and produced the
 results shown. They must be re-run after any change.
@@ -144,14 +177,31 @@ uv run mypy python
 # Success: no issues found in 92 source files
 
 uv run pytest -q
-# 49 passed in 10.49s
+# 49 passed in 9.16s
 
 uv run python scripts/check_contracts.py
 # contracts are current
 
 pnpm typecheck
-# tsc --noEmit -p tsconfig.json: passed
+# generated contracts tsc pass; desktop renderer/Electron tsc pass
+
+npm --prefix apps/desktop test
+# 8 test files, 27 tests passed
+
+npm --prefix apps/desktop run build
+# Vite production renderer + Electron main/preload build passed
+
+npm --prefix apps/desktop run package:linux
+# built ai-inference-lab-desktop_0.1.0_amd64.deb (84.0 MiB)
 ```
+
+The `.deb` was inspected with `dpkg-deb --info` and `dpkg-deb --contents`:
+the control metadata, launcher, desktop entry, icon and packaged app resources
+are present with normal modes, and `chrome-sandbox` is archived as root-owned
+mode `4755`. The
+package was extracted and the packaged Electron binary launched with
+`--no-sandbox` for a short smoke test with no preload or CSP console errors.
+That is a UI packaging smoke test, not an installation or a live controller run.
 
 `systemd-analyze verify packaging/systemd/lab-*.service` parsed all three units
 and reported only that the deployment paths
@@ -227,10 +277,19 @@ paired-bootstrap, qualification/no-winner, incomplete-coverage, simulated
 rejection and baseline-default tests, plus end-to-end simulated assertions for
 baseline scheduling and non-promotable finalization. A synthetic measured
 baseline/candidate pair is also driven through the full recipe endpoint to prove
-the accepted `validated` path; it is test data, not engine evidence. No test requires a GPU,
-downloaded weights, a live engine or external network access.
+the accepted `validated` path; it is test data, not engine evidence. No Python
+test requires a GPU, downloaded weights, a live engine or external network
+access.
 
-## 5. What is not proven
+The desktop suite uses Vitest + jsdom and renders the React shell against offline
+fixtures. It verifies every primary screen and the explicit demo label, the
+measured no-winner and simulated finalization presentations, generated contract
+compatibility, API path/method/body restrictions, report basename/content
+bounds, trusted frame origins and the main-process API proxy's bearer,
+redirect, size and error behavior. It does not launch Electron or require a
+display, GPU, controller or network.
+
+## 6. What is not proven
 
 These are intentional boundaries, not hidden gaps:
 
@@ -252,18 +311,30 @@ These are intentional boundaries, not hidden gaps:
   Its native benchmark command is not exposed by the installed build; the
   `--mtp` form is not emitted.
 - `PAUSE` currently stops the active trial at the process-group boundary; it is
-  not a resumable checkpoint. Safe-boundary pause is a Phase 5/lifecycle item.
+  not a resumable checkpoint. Safe-boundary pause remains a lifecycle item.
 - Simulated throughput, VRAM/telemetry and OOM values are deterministic test
   data, not measurements.
 - No load test at 1,000 concurrent polling workers is claimed.
-- TLS termination, remote authentication, the Electron UI, update intelligence
-  and release qualification do not exist yet.
+- TLS termination, remote authentication, update intelligence and release
+  qualification do not exist yet.
+- The Electron UI has not been run against a live controller/worker through a
+  full experiment. No graphical session smoke test can substitute for that.
+- Normal sandboxed Electron launch from the cached development install fails on
+  this host because its `chrome-sandbox` helper is user-owned mode `755`; it was
+  not made root-owned `4755` without approval. The UI smoke test used
+  `--no-sandbox`, and the archived `.deb` records the correct helper mode.
+- The `.deb` was built and inspected but not installed, signed, upgraded or
+  rolled back. AppImage packaging was not produced because `appimagetool` is not
+  installed and network/tool acquisition was not authorized.
+- The desktop dependency install has no committed `package-lock.json`; the
+  current `node_modules` is environment-specific and was not recreated from a
+  clean registry install. Reproducible dependency locking remains open.
 - Optuna and controller writes are not atomic; recovery is deterministic and
   conservative rather than a two-phase commit.
 - The systemd units are authored and syntax-checked only; they are not installed
   or enabled.
 
-## 6. Generated artifacts
+## 7. Generated artifacts
 
 Committed and regenerable:
 
@@ -282,7 +353,7 @@ pnpm generate:contracts
 pnpm contracts:check
 ```
 
-## 7. Quick start status
+## 8. Quick start status
 
 The documented quick start is in `README.md` and `AGENTS.md`:
 
@@ -300,12 +371,13 @@ uv run --env-file .env lab-worker        # real lane
 routes require the corresponding bearer token. The real worker needs readable
 engines/models and GPU access; the simulated lane needs neither.
 
-## 8. Next gate
+## 9. Next gate
 
-Phase 4 is complete at the tokenizer/workload boundary and committed locally.
-Strata source-shard resolution is implemented read-only. The open evidence items
-(full model/source-shard hashing, a real preflight, one real low-impact
-tokenized trial and a real near-capacity context check) must be executed before
-any Phase 5 recipe can be considered. See `docs/NEXT_STEPS.md`,
-`docs/progress/PHASE_2_REPORT.md`, `docs/progress/PHASE_3_REPORT.md` and
-`docs/progress/PHASE_4_REPORT.md`.
+Phases 0/1 through 6 are committed locally. Phase 6 adds the secure desktop
+operator UI and a locally built `.deb`; it does not add release intelligence.
+The open evidence items remain unchanged: full model/source-shard hashing, a
+real preflight, one real low-impact tokenized trial and a real near-capacity
+context check must run before any real validated recipe can exist. A UI run is
+also still required against a live controller/worker and must be explicitly
+approved. See `docs/NEXT_STEPS.md` and the phase reports under
+`docs/progress/`.

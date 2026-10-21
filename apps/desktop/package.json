@@ -1,0 +1,35 @@
+{
+  "name": "@lab/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Electron operator UI for the AI Inference Optimization Lab",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "build:renderer": "vite build",
+    "build:electron": "node scripts/build-electron.mjs",
+    "start": "npm run build && electron .",
+    "package:linux": "node scripts/package-linux.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit && tsc -p tsconfig.tests.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "preview": "vite preview --host 127.0.0.1 --port 4174"
+  },
+  "dependencies": {
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "electron": "40.10.2",
+    "jsdom": "29.1.1",
+    "typescript": "6.0.3",
+    "vite": "8.2.0",
+    "vitest": "4.1.11"
+  }
+}
