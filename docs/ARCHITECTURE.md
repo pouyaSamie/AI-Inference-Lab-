@@ -1,4 +1,4 @@
-# Architecture — Phases 0–6: foundation, worker, adapters, workloads, finalization and desktop UI
+# Architecture — Phases 0–7: foundation, worker, adapters, workloads, finalization, desktop UI and release intelligence
 
 Status: Phase 1 is complete and verified. Phase 2 adds a production Linux worker
 with observed engine/model discovery, native process execution, GPU UUID leases,
@@ -7,8 +7,10 @@ against the installed llama.cpp and Strata builds and adds offline conformance
 tests. Phase 4 adds tokenizer-backed workloads and Strata source-shard identity.
 Phase 5 adds paired baselines, retained primary samples and deterministic
 statistical finalization. Phase 6 adds the local Electron/React operator UI
-through a narrow, validated main-process bridge. The simulated lane remains
-separate and its evidence can never qualify a recipe.
+through a narrow, validated main-process bridge. Phase 7 adds offline release
+metadata import, deterministic impact classification, durable pin/defer
+decisions and frozen paired A/B records that never approve or install an update.
+The simulated lane remains separate and its evidence can never qualify a recipe.
 
 ## 1. Process topology
 
@@ -52,7 +54,8 @@ controller needs no inbound route to a worker.
 | `lab_core` | frozen Pydantic models, canonical JSON/hash, enums, state transitions, objective scoring, paired bootstrap and finalization | perform I/O, import FastAPI/Optuna, hold process handles |
 | `lab_bench` | deterministic context/workload matrix and normalization | launch engines or read prompt corpora |
 | `lab_adapters` | pure CLI/JSON translation, capability parsing, candidate validation, execution-plan construction | subprocess, network, filesystem, hardware probe |
-| `lab_api` | FastAPI, auth, persistence, planning, lifecycle, command queue, optimizer outbox, SSE, migrations | import Optuna, run benchmark work on the event loop |
+| `lab_updates` | release metadata contracts, deterministic impact classification, capability diff and paired A/B evaluation | network, subprocess, filesystem, installed-binary access, upgrade approval |
+| `lab_api` | FastAPI, auth, persistence, planning, lifecycle, command queue, optimizer outbox, release notices, SSE, migrations | import Optuna, run benchmark work on the event loop |
 | `lab_optimizer` | supervised Optuna process, durable request client, study reconciliation | touch the controller DB directly or execute engines |
 | `lab_worker` | enrollment, hardware/engine/model discovery, heartbeat/inventory, polling, lease ack/renew/complete, sandboxed process runner, GPU UUID leases, journal recovery, real or simulated executor | trust inbound commands, fabricate real metrics, modify installed models/engines, kill unowned processes |
 
@@ -68,13 +71,15 @@ Standalone mode uses two independent SQLite files in WAL mode:
 - `var/optuna.sqlite3` — Optuna `RDBStorage`, owned only by the optimizer.
 
 `Settings` rejects equal URLs and equal SQLite paths. Controller migrations are
-Alembic-managed (`python/lab_api/migrations`). The initial migration creates 20
+Alembic-managed (`python/lab_api/migrations`). The current schema creates 23
 tables, including:
 
 - identity/inventory: `workers`, `worker_snapshots`, `gpu_devices`, engine/model
   registry rows;
 - experiments: `experiments`, `studies`, `candidates`, `observations`,
   `recipe_rows`/recipes and contexts;
+- release intelligence: `release_notices`, `release_assessments`,
+  `engine_comparisons`;
 - durability: `worker_commands`, `optimizer_requests`, `idempotency_records`,
   `job_events`, `system_events`, `replay_floors`, `feasibility_observations`,
   `store_reconciliation`, `audit_events`.
@@ -413,8 +418,10 @@ FastAPI controller
 - Optimize renders fresh/stale inventory, preflight blockers, the six-step
   immutable plan and the selected worker/GPU/contexts. It submits through the
   existing planning/experiment endpoints.
-- Updates states that release intelligence is not implemented and never
-  downloads, replaces or installs an engine or model.
+- Updates imports offline release metadata, shows P0/P1/P2 impact and reasons,
+  supports pin/defer decisions and requests a frozen A/B proposal. It displays
+  comparison intervals and non-approving recommendations. It never downloads,
+  replaces, installs or launches an engine or model.
 - Hardware acceleration is disabled before ready by default.
   `LAB_DESKTOP_ENABLE_GPU=1` is an explicit operator override; it requires a
   restart and any shared-GPU qualification then requires contamination
@@ -430,7 +437,43 @@ is verified; installation, signing, upgrade/rollback and AppImage packaging
 remain Phase 8 release-hardening work requiring approval. A packaged build is
 not benchmark evidence.
 
-## 16. Phase boundary
+## 16. Release intelligence (Phase 7)
+
+Release intelligence is an offline review workflow, not an updater:
+
+1. an operator imports a `ReleaseMetadata` document through
+   `POST /api/v1/releases/check`;
+2. `lab_updates` classifies changed paths and explicit areas deterministically,
+   compares optional capability schemas and applies cached freshness/identity
+   rules;
+3. the controller stores a durable notice and an immutable assessment keyed by
+   release metadata, worker/model identity, installed executable hash, inventory
+   revision and policy version;
+4. the operator may pin, defer or request a paired A/B proposal;
+5. creating a proposal requires a complete verified model identity digest and
+   freezes baseline/candidate engine identities, worker, workload suite,
+   contexts, margin and confidence threshold;
+6. measured paired samples can be submitted later; evidence is immutable and a
+   terminal comparison rejects different evidence with `409`;
+7. results are `IMPROVED`, `REGRESSED`, `INCONCLUSIVE` or `INCOMPATIBLE`, with
+   `upgrade_approved=false` always.
+
+Classification is conservative: CUDA/backend/MoE/KV/context/model-loader changes
+are P0; scheduling/threading/batching/server API are P1; docs/tests are P2.
+Unknown paths are P1 and force smoke testing. Stale inventory can raise a P2
+result to P1. A missing installed engine makes the release non-applicable. A
+comparison requires the candidate executable SHA-256 and complete model hashes,
+and missing/extra contexts, mismatched identity, simulation, non-measured status
+or baseline guardrail failure is incompatible. A candidate guardrail failure or significant regression
+retains the current engine.
+
+No endpoint fetches upstream metadata, downloads an artifact, starts a candidate
+binary or writes under an engine/model root. The Electron Updates screen only
+imports JSON, records decisions and displays assessments/comparisons; it cannot
+install or approve an engine. Remote polling, artifact download and installation
+remain deferred and approval-gated.
+
+## 17. Phase boundary
 
 Phases 0/1 prove protocol, persistence, planning, lifecycle, recovery and
 pure-adapter behavior. Phase 2 proves the worker-owned process, discovery, GPU
@@ -439,6 +482,7 @@ against the installed help/version/evidence fixtures and the observed live
 surface. Phase 4 adds tokenizer-backed workload lanes and read-only Strata
 source-shard identity. Phase 5 adds paired baselines, retained samples,
 statistical finalization and the recipe qualification gate. Phase 6 adds the
-secure desktop operator UI and a locally built `.deb`. None of these offline
-checks prove real llama.cpp/Strata performance or create a real validated recipe
-without an approved live run. Release intelligence remains deferred.
+secure desktop operator UI and a locally built `.deb`. Phase 7 adds offline
+release impact assessment and frozen A/B records without installing anything.
+None of these offline checks prove real llama.cpp/Strata performance or create a
+real validated recipe without an approved live run.

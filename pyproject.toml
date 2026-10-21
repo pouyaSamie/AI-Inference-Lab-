@@ -1,12 +1,13 @@
 [project]
 name = "inference-optimization-lab"
 version = "0.1.0"
-description = "Local-first AI inference optimization laboratory (Phase 0/1 foundation)"
+description = "Local-first AI inference optimization laboratory (Phases 0-7 foundation)"
 requires-python = ">=3.12,<3.15"
 dependencies = [
   "lab-core",
   "lab-bench",
   "lab-adapters",
+  "lab-updates",
   "lab-api",
   "lab-optimizer",
   "lab-worker",
@@ -29,6 +30,7 @@ members = [
   "python/lab_core",
   "python/lab_bench",
   "python/lab_adapters",
+  "python/lab_updates",
   "python/lab_api",
   "python/lab_optimizer",
   "python/lab_worker",
@@ -38,6 +40,7 @@ members = [
 lab-core = { workspace = true }
 lab-bench = { workspace = true }
 lab-adapters = { workspace = true }
+lab-updates = { workspace = true }
 lab-api = { workspace = true }
 lab-optimizer = { workspace = true }
 lab-worker = { workspace = true }

@@ -26,7 +26,10 @@ def test_initial_migration_creates_controller_schema(tmp_path: Path) -> None:
         assert "worker_commands" in names
         assert "optimizer_requests" in names
         assert "job_events" in names
-        assert len(names) == 20
+        assert "release_notices" in names
+        assert "release_assessments" in names
+        assert "engine_comparisons" in names
+        assert len(names) == 23
         with engine.connect() as connection:
             version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
         assert version

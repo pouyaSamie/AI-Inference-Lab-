@@ -6,7 +6,7 @@ only transport-level envelopes and operator views.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -25,6 +25,7 @@ from lab_core import (
     HardwareSnapshot,
     Identifier,
     JobEvent,
+    MeasurementStatus,
     NonEmptyStr,
     NonNegativeInt,
     Objective,
@@ -40,6 +41,13 @@ from lab_core import (
     WorkerIdentity,
     WorkerSnapshot,
     WorkloadSuite,
+)
+from lab_updates import (
+    ComparisonPlan,
+    ComparisonSample,
+    ImpactAssessment,
+    ReleaseDecision,
+    ReleaseMetadata,
 )
 
 
@@ -269,3 +277,76 @@ class OptimizerRequestAck(FrozenModel):
     request_id: Identifier
     status: str
     idempotent_replay: bool = False
+
+
+class ReleaseCheckRequest(FrozenModel):
+    worker_id: Identifier
+    model_id: NonEmptyStr | None = None
+    release: ReleaseMetadata
+
+
+class ReleaseNoticeView(FrozenModel):
+    notice_id: Identifier
+    release: ReleaseMetadata
+    metadata_digest: Sha256
+    imported_at: AwareTimestamp
+    decision: ReleaseDecision
+    decision_note: str | None = None
+    decision_at: AwareTimestamp | None = None
+
+
+class ReleaseCheckResponse(FrozenModel):
+    result: Literal["imported", "reused", "already_installed"]
+    notice: ReleaseNoticeView
+    assessment: ImpactAssessment
+
+
+class ReleaseListResponse(FrozenModel):
+    notices: tuple[ReleaseNoticeView, ...]
+    total: NonNegativeInt
+
+
+class ReleaseDetailResponse(FrozenModel):
+    notice: ReleaseNoticeView
+    assessments: tuple[ImpactAssessment, ...] = ()
+    comparisons: tuple[ComparisonPlan, ...] = ()
+
+
+class ReleaseDecisionRequest(FrozenModel):
+    action: Literal["pin", "defer"]
+    note: NonEmptyStr | None = None
+
+
+class ComparisonCreateRequest(FrozenModel):
+    notice_id: Identifier
+    assessment_id: Identifier
+    contexts: tuple[ContextLength, ...]
+    objective: Objective = Objective.BALANCED
+    workload: WorkloadSuite = Field(default_factory=WorkloadSuite)
+    min_improvement_pct: float = Field(default=5.0, ge=0.0, le=100.0)
+    confidence_level: float = Field(default=0.95, gt=0.0, lt=1.0)
+
+    @model_validator(mode="after")
+    def _contexts(self) -> ComparisonCreateRequest:
+        if not self.contexts:
+            raise ValueError("at least one comparison context is required")
+        if len({int(item) for item in self.contexts}) != len(self.contexts):
+            raise ValueError("comparison contexts must be unique")
+        return self
+
+
+class ComparisonEvidenceRequest(FrozenModel):
+    worker_id: Identifier
+    model_digest: Sha256
+    workload_digest: Sha256
+    baseline_engine_sha256: Sha256
+    candidate_engine_sha256: Sha256
+    simulated: bool = False
+    measurement_status: MeasurementStatus = MeasurementStatus.MEASURED
+    samples: tuple[ComparisonSample, ...] = Field(default_factory=tuple, max_length=5_000)
+    notes: tuple[NonEmptyStr, ...] = ()
+
+
+class ComparisonListResponse(FrozenModel):
+    comparisons: tuple[ComparisonPlan, ...]
+    total: NonNegativeInt

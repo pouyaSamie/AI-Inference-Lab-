@@ -64,12 +64,15 @@ describe("desktop app shell", () => {
     await act(async () => root.unmount());
   });
 
-  it("shows the explicit later-phase boundary on Updates", async () => {
+  it("renders read-only release intelligence on Updates", async () => {
     window.history.replaceState({}, "", "/?demo=1#/updates");
     const root = createRoot(container!);
     await act(async () => root.render(<App />));
-    await flush(60);
-    expect(container!.textContent).toContain("Update intelligence is not implemented in this phase");
+    await flush(120);
+    expect(container!.textContent).toContain("Offline import only — no upstream egress");
+    expect(container!.textContent).toContain("0.7.1-demo");
+    expect(container!.textContent).toContain("Keep the current engine");
+    expect(container!.textContent).toContain("Upgrade approval remains false");
     expect(container!.textContent).toContain("Never download, replace, or patch an engine or model");
     await act(async () => root.unmount());
   });

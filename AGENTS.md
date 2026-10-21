@@ -1,6 +1,6 @@
 # AGENTS.md — working rules for this repository
 
-This repository is the Phase 0/1/2/3/4/5/6 foundation of **AI Inference Optimization Lab**.
+This repository is the Phase 0/1/2/3/4/5/6/7 foundation of **AI Inference Optimization Lab**.
 The authoritative product contract is [`docs/prd.md`](docs/prd.md) (PRD v2.1).
 When code and prose disagree, the PRD and the frozen `lab_core` models win.
 
@@ -8,7 +8,7 @@ When code and prose disagree, the PRD and the frozen `lab_core` models win.
 
 Implemented now:
 
-- local Python 3.12+ `uv` workspace with six packages;
+- local Python 3.12+ `uv` workspace with seven packages;
 - persistent FastAPI controller, SQLAlchemy 2.x, Alembic, SQLite WAL;
 - frozen Pydantic v2 contracts in `lab_core`, including execution plans;
 - independently supervised Optuna process (`lab_optimizer`) using its own SQLite store;
@@ -20,6 +20,9 @@ Implemented now:
 - read-only Strata source-shard resolution from `conversions.json` with exact basename/size checks and hashing when enabled;
 - one fixed-default paired baseline per selected context, retained `BenchSample`s and objective-relative optimizer values;
 - deterministic finalization with paired percentile bootstrap, per-context winners, complete-coverage cross-context ranking and the >=5% / 95% recipe gate;
+- offline release intelligence: deterministic P0/P1/P2 impact classification,
+  durable notices/assessments, pin/defer decisions and frozen paired A/B records
+  with non-approving results;
 - explicit **simulated** worker executor and end-to-end tests;
 - deterministic OpenAPI/JSON-Schema/TypeScript contract generation;
 - Electron/React/Vite operator UI with all ten primary screens, generated
@@ -31,9 +34,10 @@ Implemented now:
   and `dpkg-deb` (built/inspected, not installed);
 - systemd unit files and deployment documentation (authoring only, not installed).
 
-Intentionally deferred: recipes from real evidence, release intelligence,
-production systemd installation, full live GUI acceptance, AppImage packaging,
-installer signing and upgrade/rollback testing. Strata full-context proof
+Intentionally deferred: recipes from real evidence, remote/automatic release
+polling and artifact download, production systemd installation, full live GUI
+acceptance, AppImage packaging, installer signing and upgrade/rollback testing.
+Strata full-context proof
 remains `INCONCLUSIVE` until a real approved serving run; the installed build
 lacks calibration commands. The desktop dependency graph is outside the pnpm
 workspace and has no committed lockfile yet; do not claim a clean reproducible
@@ -84,7 +88,15 @@ desktop install until that is fixed.
     Packaged assets use `lab://app` with strict CSP; the renderer stays
     sandboxed and isolated. Hardware acceleration stays off unless the explicit
     `LAB_DESKTOP_ENABLE_GPU=1` override is set and contamination is verified.
-12. **`attic/` is archival.** Do not import, format, modify or activate anything
+12. **Release intelligence never touches installed artifacts.** Release checks
+    are offline metadata imports; they never fetch, download, replace or install
+    an engine/model. Impact classification is deterministic and conservative;
+    unknown paths require smoke testing. A/B records freeze identities and
+    evidence but `upgrade_approved` is always `False`. Comparison creation
+    requires a complete verified model identity digest and candidate hash. A
+    significant regression, candidate guardrail failure, simulated/non-measured
+    evidence or missing context never becomes a pass.
+13. **`attic/` is archival.** Do not import, format, modify or activate anything
     under `attic/`. It records an abandoned parallel draft only.
 
 ## Required commands
@@ -133,6 +145,8 @@ work offline and must not start an HTTP listener. CI must fail on drift.
 - `python/lab_core` — frozen contracts, canonical hashing, scoring, protocol.
 - `python/lab_bench` — deterministic workload planning and normalization.
 - `python/lab_adapters` — pure engine adapters and conformance fixtures.
+- `python/lab_updates` — pure release metadata, deterministic impact
+  classification and paired A/B evaluation; no network or process I/O.
 - `python/lab_api` — FastAPI app, auth, persistence, queues, SSE, Alembic.
 - `python/lab_optimizer` — supervised Optuna process and internal client.
 - `python/lab_worker` — real worker discovery/execution plus explicit simulation.
@@ -175,5 +189,9 @@ work offline and must not start an HTTP listener. CI must fail on drift.
   integration. Do not add direct renderer network/filesystem access, weaken the
   `lab://app` CSP, expose the bearer token or allow foreign navigation.
 - Do not log secrets, model prompts or full environment dumps.
+- Release import is offline: no controller endpoint may fetch an upstream
+  release, download an engine/model artifact, execute a candidate binary or
+  overwrite an installed build. Comparison evidence is supplied explicitly and
+  retained immutably.
 - Do not install or enable the systemd units, install the `.deb`, or sign and
   publish release artifacts without explicit operator approval.

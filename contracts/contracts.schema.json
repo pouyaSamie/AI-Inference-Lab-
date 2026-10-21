@@ -3102,6 +3102,960 @@
       "title": "CommandCompletion",
       "type": "object"
     },
+    "ComparisonEvidence": {
+      "$defs": {
+        "BenchSample": {
+          "additionalProperties": false,
+          "description": "One primary-level repeat retained for paired bootstrap confidence.\n\nThe observation's ``metrics`` remain the robust summary shown to operators.\nThese samples are the raw comparable repeats used by finalization; they are\nnever merged across prompt loads.",
+          "properties": {
+            "decode_tokens_per_sec": {
+              "title": "Decode Tokens Per Sec",
+              "type": "number"
+            },
+            "prefill_tokens_per_sec": {
+              "title": "Prefill Tokens Per Sec",
+              "type": "number"
+            },
+            "time_to_first_token_ms": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Time To First Token Ms"
+            },
+            "total_latency_ms": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Total Latency Ms"
+            }
+          },
+          "required": [
+            "prefill_tokens_per_sec",
+            "decode_tokens_per_sec"
+          ],
+          "title": "BenchSample",
+          "type": "object"
+        },
+        "ComparisonSample": {
+          "additionalProperties": false,
+          "properties": {
+            "baseline": {
+              "$ref": "#/$defs/BenchSample"
+            },
+            "baseline_guardrail_passed": {
+              "default": true,
+              "title": "Baseline Guardrail Passed",
+              "type": "boolean"
+            },
+            "candidate": {
+              "$ref": "#/$defs/BenchSample"
+            },
+            "candidate_guardrail_passed": {
+              "default": true,
+              "title": "Candidate Guardrail Passed",
+              "type": "boolean"
+            },
+            "context": {
+              "$ref": "#/$defs/ContextLength"
+            },
+            "notes": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/NonEmptyStr"
+              },
+              "title": "Notes",
+              "type": "array"
+            }
+          },
+          "required": [
+            "context",
+            "baseline",
+            "candidate"
+          ],
+          "title": "ComparisonSample",
+          "type": "object"
+        },
+        "ContextLength": {
+          "enum": [
+            4096,
+            8192,
+            16384,
+            32768,
+            65536,
+            131072
+          ],
+          "title": "ContextLength",
+          "type": "integer"
+        },
+        "MeasurementStatus": {
+          "enum": [
+            "measured",
+            "estimated",
+            "unavailable",
+            "invalid",
+            "infeasible",
+            "screening_only",
+            "simulated"
+          ],
+          "title": "MeasurementStatus",
+          "type": "string"
+        },
+        "NonEmptyStr": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "Sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "baseline_engine_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_engine_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "comparison_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "measurement_status": {
+          "$ref": "#/$defs/MeasurementStatus",
+          "default": "measured"
+        },
+        "model_digest": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "notes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NonEmptyStr"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "samples": {
+          "items": {
+            "$ref": "#/$defs/ComparisonSample"
+          },
+          "maxItems": 5000,
+          "title": "Samples",
+          "type": "array"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/NonEmptyStr",
+          "default": "1.0.0"
+        },
+        "simulated": {
+          "default": false,
+          "title": "Simulated",
+          "type": "boolean"
+        },
+        "worker_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "workload_digest": {
+          "$ref": "#/$defs/Sha256"
+        }
+      },
+      "required": [
+        "comparison_id",
+        "worker_id",
+        "model_digest",
+        "workload_digest",
+        "baseline_engine_sha256",
+        "candidate_engine_sha256"
+      ],
+      "title": "ComparisonEvidence",
+      "type": "object"
+    },
+    "ComparisonPlan": {
+      "$defs": {
+        "AwareTimestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "Backend": {
+          "enum": [
+            "cuda",
+            "cpu",
+            "metal",
+            "vulkan",
+            "rocm",
+            "unknown"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "ComparisonRecommendation": {
+          "enum": [
+            "keep_current",
+            "review_candidate"
+          ],
+          "title": "ComparisonRecommendation",
+          "type": "string"
+        },
+        "ComparisonResult": {
+          "additionalProperties": false,
+          "properties": {
+            "comparison_id": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "confidence_level": {
+              "$ref": "#/$defs/Probability",
+              "default": 0.95
+            },
+            "contexts": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/ContextComparisonResult"
+              },
+              "title": "Contexts",
+              "type": "array"
+            },
+            "evaluated_at": {
+              "$ref": "#/$defs/AwareTimestamp"
+            },
+            "min_improvement_pct": {
+              "default": 5.0,
+              "title": "Min Improvement Pct",
+              "type": "number"
+            },
+            "objective": {
+              "$ref": "#/$defs/Objective"
+            },
+            "reasons": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/NonEmptyStr"
+              },
+              "title": "Reasons",
+              "type": "array"
+            },
+            "recommendation": {
+              "$ref": "#/$defs/ComparisonRecommendation",
+              "default": "keep_current"
+            },
+            "schema_version": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "1.0.0"
+            },
+            "status": {
+              "$ref": "#/$defs/ComparisonStatus"
+            },
+            "upgrade_approved": {
+              "const": false,
+              "default": false,
+              "title": "Upgrade Approved",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "comparison_id",
+            "status",
+            "objective"
+          ],
+          "title": "ComparisonResult",
+          "type": "object"
+        },
+        "ComparisonStatus": {
+          "enum": [
+            "awaiting_evidence",
+            "improved",
+            "regressed",
+            "inconclusive",
+            "incompatible"
+          ],
+          "title": "ComparisonStatus",
+          "type": "string"
+        },
+        "ConfidenceInterval": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence_level": {
+              "$ref": "#/$defs/Probability"
+            },
+            "lower": {
+              "title": "Lower",
+              "type": "number"
+            },
+            "method": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "paired_log_ratio_bootstrap_percentile"
+            },
+            "point_estimate": {
+              "title": "Point Estimate",
+              "type": "number"
+            },
+            "resamples": {
+              "title": "Resamples",
+              "type": "integer"
+            },
+            "sample_count": {
+              "title": "Sample Count",
+              "type": "integer"
+            },
+            "upper": {
+              "title": "Upper",
+              "type": "number"
+            }
+          },
+          "required": [
+            "confidence_level",
+            "lower",
+            "upper",
+            "point_estimate",
+            "resamples",
+            "sample_count"
+          ],
+          "title": "ConfidenceInterval",
+          "type": "object"
+        },
+        "ContextComparisonResult": {
+          "additionalProperties": false,
+          "properties": {
+            "context": {
+              "$ref": "#/$defs/ContextLength"
+            },
+            "improvement_pct": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Improvement Pct"
+            },
+            "interval": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ConfidenceInterval"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "reasons": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/NonEmptyStr"
+              },
+              "title": "Reasons",
+              "type": "array"
+            },
+            "sample_count": {
+              "default": 0,
+              "title": "Sample Count",
+              "type": "integer"
+            },
+            "score": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Score"
+            },
+            "status": {
+              "$ref": "#/$defs/ContextComparisonStatus"
+            }
+          },
+          "required": [
+            "context",
+            "status"
+          ],
+          "title": "ContextComparisonResult",
+          "type": "object"
+        },
+        "ContextComparisonStatus": {
+          "enum": [
+            "improved",
+            "regressed",
+            "inconclusive"
+          ],
+          "title": "ContextComparisonStatus",
+          "type": "string"
+        },
+        "ContextLength": {
+          "enum": [
+            4096,
+            8192,
+            16384,
+            32768,
+            65536,
+            131072
+          ],
+          "title": "ContextLength",
+          "type": "integer"
+        },
+        "EngineId": {
+          "enum": [
+            "llamacpp",
+            "strata",
+            "mock_future"
+          ],
+          "title": "EngineId",
+          "type": "string"
+        },
+        "EngineIdentity": {
+          "additionalProperties": false,
+          "properties": {
+            "adapter_schema": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "1.0.0"
+            },
+            "backend": {
+              "$ref": "#/$defs/Backend",
+              "default": "unknown"
+            },
+            "build": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "engine_id": {
+              "$ref": "#/$defs/EngineId"
+            },
+            "executable_id": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "executable_path": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NonEmptyStr"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "executable_sha256": {
+              "$ref": "#/$defs/Sha256"
+            },
+            "source_commit": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Source Commit"
+            },
+            "source_digest": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "version": {
+              "$ref": "#/$defs/NonEmptyStr"
+            }
+          },
+          "required": [
+            "engine_id",
+            "version",
+            "build",
+            "executable_id",
+            "executable_sha256"
+          ],
+          "title": "EngineIdentity",
+          "type": "object"
+        },
+        "NonEmptyStr": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "NonNegativeInt": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "Objective": {
+          "enum": [
+            "balanced",
+            "decode_max",
+            "prefill_max"
+          ],
+          "title": "Objective",
+          "type": "string"
+        },
+        "PositiveInt": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "Probability": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "Sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "UnitFraction": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "type": "number"
+        },
+        "WorkloadSuite": {
+          "additionalProperties": false,
+          "properties": {
+            "dataset_id": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "lab-synthetic-v1"
+            },
+            "dataset_sha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "deterministic_sampling": {
+              "default": true,
+              "title": "Deterministic Sampling",
+              "type": "boolean"
+            },
+            "extended_output_tokens": {
+              "$ref": "#/$defs/PositiveInt",
+              "default": 1024
+            },
+            "output_tokens": {
+              "$ref": "#/$defs/PositiveInt",
+              "default": 256
+            },
+            "prompt_levels": {
+              "default": [
+                0.25,
+                0.6,
+                0.85,
+                0.98
+              ],
+              "items": {
+                "$ref": "#/$defs/UnitFraction"
+              },
+              "title": "Prompt Levels",
+              "type": "array"
+            },
+            "protocol": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "LAB-BENCH-v1"
+            },
+            "repetitions": {
+              "$ref": "#/$defs/PositiveInt",
+              "default": 3
+            },
+            "seed": {
+              "$ref": "#/$defs/NonNegativeInt",
+              "default": 42
+            },
+            "temperature": {
+              "default": 0.0,
+              "maximum": 5.0,
+              "minimum": 0.0,
+              "title": "Temperature",
+              "type": "number"
+            },
+            "top_p": {
+              "$ref": "#/$defs/UnitFraction",
+              "default": 1.0
+            }
+          },
+          "title": "WorkloadSuite",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "assessment_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "baseline_engine": {
+          "$ref": "#/$defs/EngineIdentity"
+        },
+        "candidate_engine": {
+          "$ref": "#/$defs/EngineIdentity"
+        },
+        "comparison_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "confidence_level": {
+          "$ref": "#/$defs/Probability",
+          "default": 0.95
+        },
+        "contexts": {
+          "items": {
+            "$ref": "#/$defs/ContextLength"
+          },
+          "title": "Contexts",
+          "type": "array"
+        },
+        "created_at": {
+          "$ref": "#/$defs/AwareTimestamp"
+        },
+        "evaluated_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AwareTimestamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "gpu_uuids": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NonEmptyStr"
+          },
+          "title": "Gpu Uuids",
+          "type": "array"
+        },
+        "min_improvement_pct": {
+          "default": 5.0,
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Min Improvement Pct",
+          "type": "number"
+        },
+        "model_digest": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "model_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "notice_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "objective": {
+          "$ref": "#/$defs/Objective"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComparisonResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "schema_version": {
+          "$ref": "#/$defs/NonEmptyStr",
+          "default": "1.0.0"
+        },
+        "status": {
+          "$ref": "#/$defs/ComparisonStatus",
+          "default": "awaiting_evidence"
+        },
+        "worker_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "workload": {
+          "$ref": "#/$defs/WorkloadSuite"
+        }
+      },
+      "required": [
+        "comparison_id",
+        "notice_id",
+        "assessment_id",
+        "worker_id",
+        "model_id",
+        "model_digest",
+        "baseline_engine",
+        "candidate_engine",
+        "contexts",
+        "objective"
+      ],
+      "title": "ComparisonPlan",
+      "type": "object"
+    },
+    "ComparisonResult": {
+      "$defs": {
+        "AwareTimestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "ComparisonRecommendation": {
+          "enum": [
+            "keep_current",
+            "review_candidate"
+          ],
+          "title": "ComparisonRecommendation",
+          "type": "string"
+        },
+        "ComparisonStatus": {
+          "enum": [
+            "awaiting_evidence",
+            "improved",
+            "regressed",
+            "inconclusive",
+            "incompatible"
+          ],
+          "title": "ComparisonStatus",
+          "type": "string"
+        },
+        "ConfidenceInterval": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence_level": {
+              "$ref": "#/$defs/Probability"
+            },
+            "lower": {
+              "title": "Lower",
+              "type": "number"
+            },
+            "method": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "paired_log_ratio_bootstrap_percentile"
+            },
+            "point_estimate": {
+              "title": "Point Estimate",
+              "type": "number"
+            },
+            "resamples": {
+              "title": "Resamples",
+              "type": "integer"
+            },
+            "sample_count": {
+              "title": "Sample Count",
+              "type": "integer"
+            },
+            "upper": {
+              "title": "Upper",
+              "type": "number"
+            }
+          },
+          "required": [
+            "confidence_level",
+            "lower",
+            "upper",
+            "point_estimate",
+            "resamples",
+            "sample_count"
+          ],
+          "title": "ConfidenceInterval",
+          "type": "object"
+        },
+        "ContextComparisonResult": {
+          "additionalProperties": false,
+          "properties": {
+            "context": {
+              "$ref": "#/$defs/ContextLength"
+            },
+            "improvement_pct": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Improvement Pct"
+            },
+            "interval": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ConfidenceInterval"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "reasons": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/NonEmptyStr"
+              },
+              "title": "Reasons",
+              "type": "array"
+            },
+            "sample_count": {
+              "default": 0,
+              "title": "Sample Count",
+              "type": "integer"
+            },
+            "score": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Score"
+            },
+            "status": {
+              "$ref": "#/$defs/ContextComparisonStatus"
+            }
+          },
+          "required": [
+            "context",
+            "status"
+          ],
+          "title": "ContextComparisonResult",
+          "type": "object"
+        },
+        "ContextComparisonStatus": {
+          "enum": [
+            "improved",
+            "regressed",
+            "inconclusive"
+          ],
+          "title": "ContextComparisonStatus",
+          "type": "string"
+        },
+        "ContextLength": {
+          "enum": [
+            4096,
+            8192,
+            16384,
+            32768,
+            65536,
+            131072
+          ],
+          "title": "ContextLength",
+          "type": "integer"
+        },
+        "NonEmptyStr": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "Objective": {
+          "enum": [
+            "balanced",
+            "decode_max",
+            "prefill_max"
+          ],
+          "title": "Objective",
+          "type": "string"
+        },
+        "Probability": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "comparison_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "confidence_level": {
+          "$ref": "#/$defs/Probability",
+          "default": 0.95
+        },
+        "contexts": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ContextComparisonResult"
+          },
+          "title": "Contexts",
+          "type": "array"
+        },
+        "evaluated_at": {
+          "$ref": "#/$defs/AwareTimestamp"
+        },
+        "min_improvement_pct": {
+          "default": 5.0,
+          "title": "Min Improvement Pct",
+          "type": "number"
+        },
+        "objective": {
+          "$ref": "#/$defs/Objective"
+        },
+        "reasons": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NonEmptyStr"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "recommendation": {
+          "$ref": "#/$defs/ComparisonRecommendation",
+          "default": "keep_current"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/NonEmptyStr",
+          "default": "1.0.0"
+        },
+        "status": {
+          "$ref": "#/$defs/ComparisonStatus"
+        },
+        "upgrade_approved": {
+          "const": false,
+          "default": false,
+          "title": "Upgrade Approved",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "comparison_id",
+        "status",
+        "objective"
+      ],
+      "title": "ComparisonResult",
+      "type": "object"
+    },
     "DeploymentRecipe": {
       "$defs": {
         "AwareTimestamp": {
@@ -5576,6 +6530,350 @@
       "title": "ExperimentStatusView",
       "type": "object"
     },
+    "ImpactAssessment": {
+      "$defs": {
+        "AwareTimestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "Backend": {
+          "enum": [
+            "cuda",
+            "cpu",
+            "metal",
+            "vulkan",
+            "rocm",
+            "unknown"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "CapabilityDiff": {
+          "additionalProperties": false,
+          "properties": {
+            "added": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/NonEmptyStr"
+              },
+              "title": "Added",
+              "type": "array"
+            },
+            "changed": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/NonEmptyStr"
+              },
+              "title": "Changed",
+              "type": "array"
+            },
+            "impact_class": {
+              "$ref": "#/$defs/ImpactClass",
+              "default": "P2"
+            },
+            "removed": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/NonEmptyStr"
+              },
+              "title": "Removed",
+              "type": "array"
+            }
+          },
+          "title": "CapabilityDiff",
+          "type": "object"
+        },
+        "ChangedArea": {
+          "enum": [
+            "cuda_kernel",
+            "backend_selection",
+            "moe",
+            "kv_cache",
+            "context",
+            "model_loader",
+            "scheduling",
+            "threading",
+            "batching",
+            "server_api",
+            "documentation",
+            "test_only",
+            "gpu_arch",
+            "other",
+            "unknown"
+          ],
+          "title": "ChangedArea",
+          "type": "string"
+        },
+        "EngineId": {
+          "enum": [
+            "llamacpp",
+            "strata",
+            "mock_future"
+          ],
+          "title": "EngineId",
+          "type": "string"
+        },
+        "EngineIdentity": {
+          "additionalProperties": false,
+          "properties": {
+            "adapter_schema": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "1.0.0"
+            },
+            "backend": {
+              "$ref": "#/$defs/Backend",
+              "default": "unknown"
+            },
+            "build": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "engine_id": {
+              "$ref": "#/$defs/EngineId"
+            },
+            "executable_id": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "executable_path": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NonEmptyStr"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "executable_sha256": {
+              "$ref": "#/$defs/Sha256"
+            },
+            "source_commit": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Source Commit"
+            },
+            "source_digest": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "version": {
+              "$ref": "#/$defs/NonEmptyStr"
+            }
+          },
+          "required": [
+            "engine_id",
+            "version",
+            "build",
+            "executable_id",
+            "executable_sha256"
+          ],
+          "title": "EngineIdentity",
+          "type": "object"
+        },
+        "ImpactClass": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2"
+          ],
+          "title": "ImpactClass",
+          "type": "string"
+        },
+        "NonEmptyStr": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "NonNegativeInt": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "RecommendedAction": {
+          "enum": [
+            "ignore",
+            "smoke_test",
+            "targeted_rerun",
+            "full_rerun"
+          ],
+          "title": "RecommendedAction",
+          "type": "string"
+        },
+        "Sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Deterministic applicability result for one worker/model context.",
+      "properties": {
+        "applicable": {
+          "title": "Applicable",
+          "type": "boolean"
+        },
+        "assessment_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "candidate_engine_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "capability_diff": {
+          "$ref": "#/$defs/CapabilityDiff"
+        },
+        "changed_areas": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ChangedArea"
+          },
+          "title": "Changed Areas",
+          "type": "array"
+        },
+        "created_at": {
+          "$ref": "#/$defs/AwareTimestamp"
+        },
+        "current_engine": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EngineIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "engine_id": {
+          "$ref": "#/$defs/EngineId"
+        },
+        "gpu_uuids": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NonEmptyStr"
+          },
+          "title": "Gpu Uuids",
+          "type": "array"
+        },
+        "impact": {
+          "$ref": "#/$defs/ImpactClass"
+        },
+        "inventory_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "inventory_fresh": {
+          "default": true,
+          "title": "Inventory Fresh",
+          "type": "boolean"
+        },
+        "inventory_snapshot_revision": {
+          "$ref": "#/$defs/NonNegativeInt",
+          "default": 0
+        },
+        "model_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "model_identity_complete": {
+          "default": false,
+          "title": "Model Identity Complete",
+          "type": "boolean"
+        },
+        "notice_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "policy_version": {
+          "$ref": "#/$defs/NonEmptyStr",
+          "default": "release-impact-v1"
+        },
+        "reasons": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NonEmptyStr"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "recommended_action": {
+          "$ref": "#/$defs/RecommendedAction"
+        },
+        "requires_ab": {
+          "title": "Requires Ab",
+          "type": "boolean"
+        },
+        "requires_smoke": {
+          "title": "Requires Smoke",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/NonEmptyStr",
+          "default": "1.0.0"
+        },
+        "worker_id": {
+          "$ref": "#/$defs/NonEmptyStr"
+        }
+      },
+      "required": [
+        "assessment_id",
+        "notice_id",
+        "worker_id",
+        "engine_id",
+        "applicable",
+        "impact",
+        "requires_smoke",
+        "requires_ab",
+        "recommended_action"
+      ],
+      "title": "ImpactAssessment",
+      "type": "object"
+    },
     "JobEvent": {
       "$defs": {
         "AwareTimestamp": {
@@ -7284,6 +8582,574 @@
         "idempotency_key"
       ],
       "title": "OptimizerRequest",
+      "type": "object"
+    },
+    "ReleaseMetadata": {
+      "$defs": {
+        "AwareTimestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "Backend": {
+          "enum": [
+            "cuda",
+            "cpu",
+            "metal",
+            "vulkan",
+            "rocm",
+            "unknown"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "CapabilityDescriptor": {
+          "additionalProperties": false,
+          "description": "One observed, typed engine parameter.\n\nFlags absent from the installed binary must not be represented as\nsupported. ``provenance`` records how support was established.",
+          "properties": {
+            "constraints": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Constraints",
+              "type": "array"
+            },
+            "default": {
+              "$ref": "#/$defs/JsonScalar",
+              "default": null
+            },
+            "impact_class": {
+              "$ref": "#/$defs/ImpactClass",
+              "default": "P2"
+            },
+            "incompatibilities": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Incompatibilities",
+              "type": "array"
+            },
+            "key": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "kind": {
+              "$ref": "#/$defs/CapabilityKind"
+            },
+            "legal_values": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/JsonScalar"
+              },
+              "title": "Legal Values",
+              "type": "array"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maximum"
+            },
+            "minimum": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Minimum"
+            },
+            "provenance": {
+              "$ref": "#/$defs/CapabilityProvenance",
+              "default": "observed_cli"
+            },
+            "quality_risk": {
+              "default": false,
+              "title": "Quality Risk",
+              "type": "boolean"
+            },
+            "restart_required": {
+              "default": false,
+              "title": "Restart Required",
+              "type": "boolean"
+            },
+            "step": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Step"
+            },
+            "support": {
+              "$ref": "#/$defs/SupportLevel",
+              "default": "supported"
+            }
+          },
+          "required": [
+            "key",
+            "kind"
+          ],
+          "title": "CapabilityDescriptor",
+          "type": "object"
+        },
+        "CapabilityKind": {
+          "enum": [
+            "bool",
+            "int",
+            "float",
+            "enum",
+            "string"
+          ],
+          "title": "CapabilityKind",
+          "type": "string"
+        },
+        "CapabilityProvenance": {
+          "enum": [
+            "observed_cli",
+            "observed_server_api",
+            "approved_rule",
+            "installed_manifest",
+            "unverified"
+          ],
+          "title": "CapabilityProvenance",
+          "type": "string"
+        },
+        "ChangedArea": {
+          "enum": [
+            "cuda_kernel",
+            "backend_selection",
+            "moe",
+            "kv_cache",
+            "context",
+            "model_loader",
+            "scheduling",
+            "threading",
+            "batching",
+            "server_api",
+            "documentation",
+            "test_only",
+            "gpu_arch",
+            "other",
+            "unknown"
+          ],
+          "title": "ChangedArea",
+          "type": "string"
+        },
+        "EngineCapabilityManifest": {
+          "additionalProperties": false,
+          "properties": {
+            "backend": {
+              "$ref": "#/$defs/Backend"
+            },
+            "descriptors": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/CapabilityDescriptor"
+              },
+              "title": "Descriptors",
+              "type": "array"
+            },
+            "engine": {
+              "$ref": "#/$defs/EngineIdentity"
+            },
+            "help_sha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "notes": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Notes",
+              "type": "array"
+            },
+            "probed_at": {
+              "$ref": "#/$defs/AwareTimestamp"
+            },
+            "schema_version": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "1.0.0"
+            },
+            "version_output_sha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "engine",
+            "backend",
+            "probed_at"
+          ],
+          "title": "EngineCapabilityManifest",
+          "type": "object"
+        },
+        "EngineId": {
+          "enum": [
+            "llamacpp",
+            "strata",
+            "mock_future"
+          ],
+          "title": "EngineId",
+          "type": "string"
+        },
+        "EngineIdentity": {
+          "additionalProperties": false,
+          "properties": {
+            "adapter_schema": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "1.0.0"
+            },
+            "backend": {
+              "$ref": "#/$defs/Backend",
+              "default": "unknown"
+            },
+            "build": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "engine_id": {
+              "$ref": "#/$defs/EngineId"
+            },
+            "executable_id": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "executable_path": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NonEmptyStr"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "executable_sha256": {
+              "$ref": "#/$defs/Sha256"
+            },
+            "source_commit": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Source Commit"
+            },
+            "source_digest": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "version": {
+              "$ref": "#/$defs/NonEmptyStr"
+            }
+          },
+          "required": [
+            "engine_id",
+            "version",
+            "build",
+            "executable_id",
+            "executable_sha256"
+          ],
+          "title": "EngineIdentity",
+          "type": "object"
+        },
+        "ImpactClass": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2"
+          ],
+          "title": "ImpactClass",
+          "type": "string"
+        },
+        "JsonScalar": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "NonEmptyStr": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "NonNegativeInt": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ReleaseAsset": {
+          "additionalProperties": false,
+          "description": "Metadata for one official release asset. It is never downloaded here.",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "platform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NonEmptyStr"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "sha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "size_bytes": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NonNegativeInt"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NonEmptyStr"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "title": "ReleaseAsset",
+          "type": "object"
+        },
+        "ReleaseSource": {
+          "enum": [
+            "offline_import",
+            "manual",
+            "github_release"
+          ],
+          "title": "ReleaseSource",
+          "type": "string"
+        },
+        "Sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "SupportLevel": {
+          "enum": [
+            "supported",
+            "unsupported",
+            "unknown",
+            "conditional"
+          ],
+          "title": "SupportLevel",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Operator-supplied release facts.\n\nA pinned local checkout, release feed or official manifest may populate this\nmodel. ``capability_manifest`` is optional and must describe the candidate\nbuild when present; it is not treated as an installed observation.",
+      "properties": {
+        "affected_model_families": {
+          "items": {
+            "$ref": "#/$defs/NonEmptyStr"
+          },
+          "maxItems": 64,
+          "title": "Affected Model Families",
+          "type": "array"
+        },
+        "artifact_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "assets": {
+          "items": {
+            "$ref": "#/$defs/ReleaseAsset"
+          },
+          "maxItems": 100,
+          "title": "Assets",
+          "type": "array"
+        },
+        "backend": {
+          "$ref": "#/$defs/Backend",
+          "default": "unknown"
+        },
+        "build": {
+          "$ref": "#/$defs/NonEmptyStr"
+        },
+        "capability_manifest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EngineCapabilityManifest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "changed_areas": {
+          "items": {
+            "$ref": "#/$defs/ChangedArea"
+          },
+          "maxItems": 64,
+          "title": "Changed Areas",
+          "type": "array"
+        },
+        "changed_paths": {
+          "items": {
+            "$ref": "#/$defs/NonEmptyStr"
+          },
+          "maxItems": 2000,
+          "title": "Changed Paths",
+          "type": "array"
+        },
+        "changelog": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "engine_id": {
+          "$ref": "#/$defs/EngineId"
+        },
+        "executable_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/NonEmptyStr"
+          },
+          "maxItems": 100,
+          "title": "Notes",
+          "type": "array"
+        },
+        "released_at": {
+          "$ref": "#/$defs/AwareTimestamp"
+        },
+        "source": {
+          "$ref": "#/$defs/ReleaseSource",
+          "default": "offline_import"
+        },
+        "source_commit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_url": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "version": {
+          "$ref": "#/$defs/NonEmptyStr"
+        }
+      },
+      "required": [
+        "engine_id",
+        "version",
+        "build",
+        "released_at"
+      ],
+      "title": "ReleaseMetadata",
       "type": "object"
     },
     "SearchSpaceSpec": {

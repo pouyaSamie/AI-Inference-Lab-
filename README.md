@@ -1,9 +1,10 @@
 # AI Inference Optimization Lab
 
-Phase 6 foundation for a local-first inference optimization controller,
+Phase 7 foundation for a local-first inference optimization controller,
 supervised Optuna process, durable Linux worker protocol, conformance-tested
 llama.cpp/Strata adapters, tokenizer-backed benchmark workloads, paired
-statistical finalization and a secure Electron/React operator console.
+statistical finalization, offline release intelligence and a secure
+Electron/React operator console.
 
 > **The execution lanes are separate.** `lab-worker-sim` produces deterministic
 > simulated observations marked `simulated=true`; those can never qualify a
@@ -18,6 +19,15 @@ statistical finalization and a secure Electron/React operator console.
 > produce a validated recipe. The Electron UI is a view/control surface: it
 > never owns jobs or engines, and its offline demo mode is always labelled and
 > cannot create or qualify evidence.
+>
+> **Release checks are offline and read-only.** The controller imports
+> operator-supplied release metadata, classifies impact deterministically and
+> can freeze a paired old/new A/B record. It never queries upstream, downloads
+> or installs an engine, or changes an installed artifact. Comparison results
+> never approve an upgrade (`upgrade_approved` is always `false`). A comparison
+> also requires a complete verified model identity and candidate executable
+> hash; simulated, non-measured, context-incomplete or guardrail-failing
+> evidence is incompatible or ineligible.
 
 The authoritative specification is [`docs/prd.md`](docs/prd.md). Architecture
 and decisions are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
@@ -149,6 +159,8 @@ serving run.
 - `python/lab_core` — frozen contracts, canonical hashes, scoring primitives.
 - `python/lab_bench` — deterministic workload/context planning.
 - `python/lab_adapters` — pure llama.cpp and Strata translators/parsers.
+- `python/lab_updates` — pure release metadata, impact classification and
+  paired A/B evaluation.
 - `python/lab_api` — FastAPI controller, persistence, queues, SSE, Alembic.
 - `python/lab_optimizer` — independent Optuna process.
 - `python/lab_worker` — real worker discovery/execution plus explicit simulator.
@@ -173,6 +185,9 @@ serving run.
   explicit conflict handling.
 - The Electron renderer never receives the operator token or unrestricted
   network/filesystem access; all controller traffic uses validated IPC.
+- Release import is offline; no endpoint fetches, downloads, replaces or installs
+  an engine/model. A/B evidence is explicit and immutable, and no result
+  automatically approves or installs an upgrade.
 - A packaged desktop build, a simulated run and an offline fixture are never
   evidence of real performance or a validated recipe.
 - `docs/prd.md` remains the product source of truth.

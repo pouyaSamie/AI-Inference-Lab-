@@ -843,6 +843,41 @@
         "title": "CapabilityDescriptor",
         "type": "object"
       },
+      "CapabilityDiff": {
+        "additionalProperties": false,
+        "properties": {
+          "added": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Added",
+            "type": "array"
+          },
+          "changed": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Changed",
+            "type": "array"
+          },
+          "impact_class": {
+            "$ref": "#/components/schemas/ImpactClass",
+            "default": "P2"
+          },
+          "removed": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Removed",
+            "type": "array"
+          }
+        },
+        "title": "CapabilityDiff",
+        "type": "object"
+      },
       "CapabilityKind": {
         "enum": [
           "bool",
@@ -863,6 +898,27 @@
           "unverified"
         ],
         "title": "CapabilityProvenance",
+        "type": "string"
+      },
+      "ChangedArea": {
+        "enum": [
+          "cuda_kernel",
+          "backend_selection",
+          "moe",
+          "kv_cache",
+          "context",
+          "model_loader",
+          "scheduling",
+          "threading",
+          "batching",
+          "server_api",
+          "documentation",
+          "test_only",
+          "gpu_arch",
+          "other",
+          "unknown"
+        ],
+        "title": "ChangedArea",
         "type": "string"
       },
       "ClaimTrialPayload": {
@@ -1133,6 +1189,364 @@
         "title": "CommandType",
         "type": "string"
       },
+      "ComparisonCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "confidence_level": {
+            "default": 0.95,
+            "exclusiveMaximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Confidence Level",
+            "type": "number"
+          },
+          "contexts": {
+            "items": {
+              "$ref": "#/components/schemas/ContextLength"
+            },
+            "title": "Contexts",
+            "type": "array"
+          },
+          "min_improvement_pct": {
+            "default": 5.0,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Improvement Pct",
+            "type": "number"
+          },
+          "notice_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/Objective",
+            "default": "balanced"
+          },
+          "workload": {
+            "$ref": "#/components/schemas/WorkloadSuite"
+          }
+        },
+        "required": [
+          "notice_id",
+          "assessment_id",
+          "contexts"
+        ],
+        "title": "ComparisonCreateRequest",
+        "type": "object"
+      },
+      "ComparisonEvidenceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_engine_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "candidate_engine_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "measurement_status": {
+            "$ref": "#/components/schemas/MeasurementStatus",
+            "default": "measured"
+          },
+          "model_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/ComparisonSample"
+            },
+            "maxItems": 5000,
+            "title": "Samples",
+            "type": "array"
+          },
+          "simulated": {
+            "default": false,
+            "title": "Simulated",
+            "type": "boolean"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "workload_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          }
+        },
+        "required": [
+          "worker_id",
+          "model_digest",
+          "workload_digest",
+          "baseline_engine_sha256",
+          "candidate_engine_sha256"
+        ],
+        "title": "ComparisonEvidenceRequest",
+        "type": "object"
+      },
+      "ComparisonListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "comparisons": {
+            "items": {
+              "$ref": "#/components/schemas/ComparisonPlan"
+            },
+            "title": "Comparisons",
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "comparisons",
+          "total"
+        ],
+        "title": "ComparisonListResponse",
+        "type": "object"
+      },
+      "ComparisonPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "baseline_engine": {
+            "$ref": "#/components/schemas/EngineIdentity"
+          },
+          "candidate_engine": {
+            "$ref": "#/components/schemas/EngineIdentity"
+          },
+          "comparison_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "confidence_level": {
+            "$ref": "#/components/schemas/Probability",
+            "default": 0.95
+          },
+          "contexts": {
+            "items": {
+              "$ref": "#/components/schemas/ContextLength"
+            },
+            "title": "Contexts",
+            "type": "array"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "evaluated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AwareTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gpu_uuids": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Gpu Uuids",
+            "type": "array"
+          },
+          "min_improvement_pct": {
+            "default": 5.0,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Improvement Pct",
+            "type": "number"
+          },
+          "model_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "model_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "notice_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/Objective"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparisonResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ComparisonStatus",
+            "default": "awaiting_evidence"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "workload": {
+            "$ref": "#/components/schemas/WorkloadSuite"
+          }
+        },
+        "required": [
+          "comparison_id",
+          "notice_id",
+          "assessment_id",
+          "worker_id",
+          "model_id",
+          "model_digest",
+          "baseline_engine",
+          "candidate_engine",
+          "contexts",
+          "objective"
+        ],
+        "title": "ComparisonPlan",
+        "type": "object"
+      },
+      "ComparisonRecommendation": {
+        "enum": [
+          "keep_current",
+          "review_candidate"
+        ],
+        "title": "ComparisonRecommendation",
+        "type": "string"
+      },
+      "ComparisonResult": {
+        "additionalProperties": false,
+        "properties": {
+          "comparison_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "confidence_level": {
+            "$ref": "#/components/schemas/Probability",
+            "default": 0.95
+          },
+          "contexts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ContextComparisonResult"
+            },
+            "title": "Contexts",
+            "type": "array"
+          },
+          "evaluated_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "min_improvement_pct": {
+            "default": 5.0,
+            "title": "Min Improvement Pct",
+            "type": "number"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/Objective"
+          },
+          "reasons": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "recommendation": {
+            "$ref": "#/components/schemas/ComparisonRecommendation",
+            "default": "keep_current"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ComparisonStatus"
+          },
+          "upgrade_approved": {
+            "const": false,
+            "default": false,
+            "title": "Upgrade Approved",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "comparison_id",
+          "status",
+          "objective"
+        ],
+        "title": "ComparisonResult",
+        "type": "object"
+      },
+      "ComparisonSample": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/BenchSample"
+          },
+          "baseline_guardrail_passed": {
+            "default": true,
+            "title": "Baseline Guardrail Passed",
+            "type": "boolean"
+          },
+          "candidate": {
+            "$ref": "#/components/schemas/BenchSample"
+          },
+          "candidate_guardrail_passed": {
+            "default": true,
+            "title": "Candidate Guardrail Passed",
+            "type": "boolean"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ContextLength"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "context",
+          "baseline",
+          "candidate"
+        ],
+        "title": "ComparisonSample",
+        "type": "object"
+      },
+      "ComparisonStatus": {
+        "enum": [
+          "awaiting_evidence",
+          "improved",
+          "regressed",
+          "inconclusive",
+          "incompatible"
+        ],
+        "title": "ComparisonStatus",
+        "type": "string"
+      },
       "CompletionResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1220,6 +1634,77 @@
         ],
         "title": "ConfidenceInterval",
         "type": "object"
+      },
+      "ContextComparisonResult": {
+        "additionalProperties": false,
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/ContextLength"
+          },
+          "improvement_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Improvement Pct"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfidenceInterval"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reasons": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "sample_count": {
+            "default": 0,
+            "title": "Sample Count",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ContextComparisonStatus"
+          }
+        },
+        "required": [
+          "context",
+          "status"
+        ],
+        "title": "ContextComparisonResult",
+        "type": "object"
+      },
+      "ContextComparisonStatus": {
+        "enum": [
+          "improved",
+          "regressed",
+          "inconclusive"
+        ],
+        "title": "ContextComparisonStatus",
+        "type": "string"
       },
       "ContextEvaluation": {
         "additionalProperties": false,
@@ -2630,6 +3115,157 @@
         "minLength": 1,
         "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
         "type": "string"
+      },
+      "ImpactAssessment": {
+        "additionalProperties": false,
+        "description": "Deterministic applicability result for one worker/model context.",
+        "properties": {
+          "applicable": {
+            "title": "Applicable",
+            "type": "boolean"
+          },
+          "assessment_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "candidate_engine_sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capability_diff": {
+            "$ref": "#/components/schemas/CapabilityDiff"
+          },
+          "changed_areas": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ChangedArea"
+            },
+            "title": "Changed Areas",
+            "type": "array"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "current_engine": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EngineIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "engine_id": {
+            "$ref": "#/components/schemas/EngineId"
+          },
+          "gpu_uuids": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Gpu Uuids",
+            "type": "array"
+          },
+          "impact": {
+            "$ref": "#/components/schemas/ImpactClass"
+          },
+          "inventory_digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inventory_fresh": {
+            "default": true,
+            "title": "Inventory Fresh",
+            "type": "boolean"
+          },
+          "inventory_snapshot_revision": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "model_digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_identity_complete": {
+            "default": false,
+            "title": "Model Identity Complete",
+            "type": "boolean"
+          },
+          "notice_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "policy_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "release-impact-v1"
+          },
+          "reasons": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "recommended_action": {
+            "$ref": "#/components/schemas/RecommendedAction"
+          },
+          "requires_ab": {
+            "title": "Requires Ab",
+            "type": "boolean"
+          },
+          "requires_smoke": {
+            "title": "Requires Smoke",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "1.0.0"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "assessment_id",
+          "notice_id",
+          "worker_id",
+          "engine_id",
+          "applicable",
+          "impact",
+          "requires_smoke",
+          "requires_ab",
+          "recommended_action"
+        ],
+        "title": "ImpactAssessment",
+        "type": "object"
       },
       "ImpactClass": {
         "enum": [
@@ -4258,6 +4894,16 @@
         "title": "RecipeView",
         "type": "object"
       },
+      "RecommendedAction": {
+        "enum": [
+          "ignore",
+          "smoke_test",
+          "targeted_rerun",
+          "full_rerun"
+        ],
+        "title": "RecommendedAction",
+        "type": "string"
+      },
       "ReconcilePayload": {
         "additionalProperties": false,
         "properties": {
@@ -4319,6 +4965,395 @@
         ],
         "title": "ReconcileResult",
         "type": "object"
+      },
+      "ReleaseAsset": {
+        "additionalProperties": false,
+        "description": "Metadata for one official release asset. It is never downloaded here.",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonNegativeInt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ReleaseAsset",
+        "type": "object"
+      },
+      "ReleaseCheckRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "model_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "release": {
+            "$ref": "#/components/schemas/ReleaseMetadata"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "worker_id",
+          "release"
+        ],
+        "title": "ReleaseCheckRequest",
+        "type": "object"
+      },
+      "ReleaseCheckResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment": {
+            "$ref": "#/components/schemas/ImpactAssessment"
+          },
+          "notice": {
+            "$ref": "#/components/schemas/ReleaseNoticeView"
+          },
+          "result": {
+            "enum": [
+              "imported",
+              "reused",
+              "already_installed"
+            ],
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result",
+          "notice",
+          "assessment"
+        ],
+        "title": "ReleaseCheckResponse",
+        "type": "object"
+      },
+      "ReleaseDecision": {
+        "enum": [
+          "pending",
+          "pinned",
+          "deferred",
+          "comparison_requested"
+        ],
+        "title": "ReleaseDecision",
+        "type": "string"
+      },
+      "ReleaseDecisionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "pin",
+              "defer"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "ReleaseDecisionRequest",
+        "type": "object"
+      },
+      "ReleaseDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assessments": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ImpactAssessment"
+            },
+            "title": "Assessments",
+            "type": "array"
+          },
+          "comparisons": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ComparisonPlan"
+            },
+            "title": "Comparisons",
+            "type": "array"
+          },
+          "notice": {
+            "$ref": "#/components/schemas/ReleaseNoticeView"
+          }
+        },
+        "required": [
+          "notice"
+        ],
+        "title": "ReleaseDetailResponse",
+        "type": "object"
+      },
+      "ReleaseListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "notices": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseNoticeView"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          }
+        },
+        "required": [
+          "notices",
+          "total"
+        ],
+        "title": "ReleaseListResponse",
+        "type": "object"
+      },
+      "ReleaseMetadata": {
+        "additionalProperties": false,
+        "description": "Operator-supplied release facts.\n\nA pinned local checkout, release feed or official manifest may populate this\nmodel. ``capability_manifest`` is optional and must describe the candidate\nbuild when present; it is not treated as an installed observation.",
+        "properties": {
+          "affected_model_families": {
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "maxItems": 64,
+            "title": "Affected Model Families",
+            "type": "array"
+          },
+          "artifact_sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseAsset"
+            },
+            "maxItems": 100,
+            "title": "Assets",
+            "type": "array"
+          },
+          "backend": {
+            "$ref": "#/components/schemas/Backend",
+            "default": "unknown"
+          },
+          "build": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "capability_manifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EngineCapabilityManifest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changed_areas": {
+            "items": {
+              "$ref": "#/components/schemas/ChangedArea"
+            },
+            "maxItems": 64,
+            "title": "Changed Areas",
+            "type": "array"
+          },
+          "changed_paths": {
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "maxItems": 2000,
+            "title": "Changed Paths",
+            "type": "array"
+          },
+          "changelog": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "engine_id": {
+            "$ref": "#/components/schemas/EngineId"
+          },
+          "executable_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyStr"
+            },
+            "maxItems": 100,
+            "title": "Notes",
+            "type": "array"
+          },
+          "released_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ReleaseSource",
+            "default": "offline_import"
+          },
+          "source_commit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonEmptyStr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          }
+        },
+        "required": [
+          "engine_id",
+          "version",
+          "build",
+          "released_at"
+        ],
+        "title": "ReleaseMetadata",
+        "type": "object"
+      },
+      "ReleaseNoticeView": {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/ReleaseDecision"
+          },
+          "decision_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AwareTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Note"
+          },
+          "imported_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "metadata_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "notice_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "release": {
+            "$ref": "#/components/schemas/ReleaseMetadata"
+          }
+        },
+        "required": [
+          "notice_id",
+          "release",
+          "metadata_digest",
+          "imported_at",
+          "decision"
+        ],
+        "title": "ReleaseNoticeView",
+        "type": "object"
+      },
+      "ReleaseSource": {
+        "enum": [
+          "offline_import",
+          "manual",
+          "github_release"
+        ],
+        "title": "ReleaseSource",
+        "type": "string"
       },
       "ResourceConstraints": {
         "additionalProperties": false,
@@ -5673,6 +6708,254 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/comparisons": {
+      "get": {
+        "operationId": "list_all_comparisons_api_v1_comparisons_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "notice_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Notice Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List All Comparisons",
+        "tags": [
+          "releases"
+        ]
+      },
+      "post": {
+        "operationId": "propose_api_v1_comparisons_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComparisonCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/v1/comparisons/{comparison_id}": {
+      "get": {
+        "operationId": "get_one_comparison_api_v1_comparisons__comparison_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comparison_id",
+            "required": true,
+            "schema": {
+              "title": "Comparison Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get One Comparison",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/v1/comparisons/{comparison_id}/evidence": {
+      "post": {
+        "operationId": "evaluate_api_v1_comparisons__comparison_id__evidence_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comparison_id",
+            "required": true,
+            "schema": {
+              "title": "Comparison Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComparisonEvidenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
     "/api/v1/experiments": {
       "get": {
         "operationId": "list_all_api_v1_experiments_get",
@@ -7028,6 +8311,240 @@
         "summary": "Verify",
         "tags": [
           "recipes"
+        ]
+      }
+    },
+    "/api/v1/releases": {
+      "get": {
+        "operationId": "list_all_api_v1_releases_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List All",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/v1/releases/check": {
+      "post": {
+        "operationId": "check_release_api_v1_releases_check_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseCheckResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Release",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/v1/releases/{notice_id}": {
+      "get": {
+        "operationId": "get_one_api_v1_releases__notice_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "title": "Notice Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get One",
+        "tags": [
+          "releases"
+        ]
+      }
+    },
+    "/api/v1/releases/{notice_id}/decision": {
+      "post": {
+        "operationId": "decide_api_v1_releases__notice_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "title": "Notice Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide",
+        "tags": [
+          "releases"
         ]
       }
     },

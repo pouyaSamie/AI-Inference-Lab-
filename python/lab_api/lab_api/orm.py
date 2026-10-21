@@ -391,3 +391,78 @@ class SystemEventRow(Base):
     type: Mapped[str] = mapped_column(String(64))
     payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ReleaseNoticeRow(Base):
+    __tablename__ = "release_notices"
+    __table_args__ = (Index("ix_release_notices_engine_version", "engine_id", "version"),)
+
+    notice_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    engine_id: Mapped[str] = mapped_column(String(32))
+    version: Mapped[str] = mapped_column(String(128))
+    build: Mapped[str] = mapped_column(String(128))
+    source: Mapped[str] = mapped_column(String(32), default="offline_import")
+    metadata_digest: Mapped[str] = mapped_column(String(64), unique=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON)
+    decision: Mapped[str] = mapped_column(String(32), default="pending")
+    decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decision_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ReleaseAssessmentRow(Base):
+    __tablename__ = "release_assessments"
+    __table_args__ = (
+        UniqueConstraint(
+            "notice_id",
+            "worker_id",
+            "model_id",
+            "model_digest",
+            "policy_version",
+            "current_engine_sha256",
+            "inventory_snapshot_revision",
+            "inventory_fresh",
+            name="uq_release_assessment_identity",
+        ),
+        Index("ix_release_assessments_notice_worker", "notice_id", "worker_id"),
+    )
+
+    assessment_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    notice_id: Mapped[str] = mapped_column(ForeignKey("release_notices.notice_id", ondelete="CASCADE"))
+    worker_id: Mapped[str] = mapped_column(ForeignKey("workers.worker_id", ondelete="CASCADE"))
+    model_id: Mapped[str] = mapped_column(String(200), default="")
+    model_digest: Mapped[str] = mapped_column(String(64), default="")
+    policy_version: Mapped[str] = mapped_column(String(64))
+    current_engine_sha256: Mapped[str] = mapped_column(String(64), default="")
+    inventory_snapshot_revision: Mapped[int] = mapped_column(Integer, default=0)
+    inventory_fresh: Mapped[bool] = mapped_column(Boolean, default=True)
+    applicable: Mapped[bool] = mapped_column(Boolean, default=False)
+    impact: Mapped[str] = mapped_column(String(8))
+    requires_ab: Mapped[bool] = mapped_column(Boolean, default=False)
+    recommended_action: Mapped[str] = mapped_column(String(32))
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class EngineComparisonRow(Base):
+    __tablename__ = "engine_comparisons"
+    __table_args__ = (
+        Index("ix_engine_comparisons_notice_status", "notice_id", "status"),
+        Index("ix_engine_comparisons_worker", "worker_id"),
+    )
+
+    comparison_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    notice_id: Mapped[str] = mapped_column(ForeignKey("release_notices.notice_id", ondelete="CASCADE"))
+    assessment_id: Mapped[str] = mapped_column(
+        ForeignKey("release_assessments.assessment_id", ondelete="CASCADE")
+    )
+    worker_id: Mapped[str] = mapped_column(ForeignKey("workers.worker_id", ondelete="CASCADE"))
+    model_id: Mapped[str] = mapped_column(String(200))
+    model_digest: Mapped[str] = mapped_column(String(64))
+    objective: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(32), default="awaiting_evidence")
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON)
+    evidence_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

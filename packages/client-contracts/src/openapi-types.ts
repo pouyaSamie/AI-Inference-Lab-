@@ -141,8 +141,15 @@ export interface components {
       "step"?: number | null;
       "support"?: components["schemas"]["SupportLevel"];
     };
+    "CapabilityDiff": {
+      "added"?: components["schemas"]["NonEmptyStr"][];
+      "changed"?: components["schemas"]["NonEmptyStr"][];
+      "impact_class"?: components["schemas"]["ImpactClass"];
+      "removed"?: components["schemas"]["NonEmptyStr"][];
+    };
     "CapabilityKind": "bool" | "int" | "float" | "enum" | "string";
     "CapabilityProvenance": "observed_cli" | "observed_server_api" | "approved_rule" | "installed_manifest" | "unverified";
+    "ChangedArea": "cuda_kernel" | "backend_selection" | "moe" | "kv_cache" | "context" | "model_loader" | "scheduling" | "threading" | "batching" | "server_api" | "documentation" | "test_only" | "gpu_arch" | "other" | "unknown";
     "ClaimTrialPayload": {
       "candidate_id": components["schemas"]["Identifier"];
       "command_type"?: "CLAIM_TRIAL";
@@ -187,6 +194,75 @@ export interface components {
     };
     "CommandStatus": "pending" | "leased" | "acknowledged" | "running" | "completed" | "failed" | "rejected" | "expired" | "cancelled";
     "CommandType": "SCAN" | "PREFLIGHT" | "CLAIM_TRIAL" | "PAUSE" | "CANCEL" | "VERIFY_RECIPE" | "PROMOTE";
+    "ComparisonCreateRequest": {
+      "assessment_id": components["schemas"]["Identifier"];
+      "confidence_level"?: number;
+      "contexts": components["schemas"]["ContextLength"][];
+      "min_improvement_pct"?: number;
+      "notice_id": components["schemas"]["Identifier"];
+      "objective"?: components["schemas"]["Objective"];
+      "workload"?: components["schemas"]["WorkloadSuite"];
+    };
+    "ComparisonEvidenceRequest": {
+      "baseline_engine_sha256": components["schemas"]["Sha256"];
+      "candidate_engine_sha256": components["schemas"]["Sha256"];
+      "measurement_status"?: components["schemas"]["MeasurementStatus"];
+      "model_digest": components["schemas"]["Sha256"];
+      "notes"?: components["schemas"]["NonEmptyStr"][];
+      "samples"?: components["schemas"]["ComparisonSample"][];
+      "simulated"?: boolean;
+      "worker_id": components["schemas"]["Identifier"];
+      "workload_digest": components["schemas"]["Sha256"];
+    };
+    "ComparisonListResponse": {
+      "comparisons": components["schemas"]["ComparisonPlan"][];
+      "total": components["schemas"]["NonNegativeInt"];
+    };
+    "ComparisonPlan": {
+      "assessment_id": components["schemas"]["NonEmptyStr"];
+      "baseline_engine": components["schemas"]["EngineIdentity"];
+      "candidate_engine": components["schemas"]["EngineIdentity"];
+      "comparison_id": components["schemas"]["NonEmptyStr"];
+      "confidence_level"?: components["schemas"]["Probability"];
+      "contexts": components["schemas"]["ContextLength"][];
+      "created_at"?: components["schemas"]["AwareTimestamp"];
+      "evaluated_at"?: components["schemas"]["AwareTimestamp"] | null;
+      "evidence_digest"?: components["schemas"]["Sha256"] | null;
+      "gpu_uuids"?: components["schemas"]["NonEmptyStr"][];
+      "min_improvement_pct"?: number;
+      "model_digest": components["schemas"]["Sha256"];
+      "model_id": components["schemas"]["NonEmptyStr"];
+      "notice_id": components["schemas"]["NonEmptyStr"];
+      "objective": components["schemas"]["Objective"];
+      "result"?: components["schemas"]["ComparisonResult"] | null;
+      "schema_version"?: components["schemas"]["NonEmptyStr"];
+      "status"?: components["schemas"]["ComparisonStatus"];
+      "worker_id": components["schemas"]["NonEmptyStr"];
+      "workload"?: components["schemas"]["WorkloadSuite"];
+    };
+    "ComparisonRecommendation": "keep_current" | "review_candidate";
+    "ComparisonResult": {
+      "comparison_id": components["schemas"]["NonEmptyStr"];
+      "confidence_level"?: components["schemas"]["Probability"];
+      "contexts"?: components["schemas"]["ContextComparisonResult"][];
+      "evaluated_at"?: components["schemas"]["AwareTimestamp"];
+      "min_improvement_pct"?: number;
+      "objective": components["schemas"]["Objective"];
+      "reasons"?: components["schemas"]["NonEmptyStr"][];
+      "recommendation"?: components["schemas"]["ComparisonRecommendation"];
+      "schema_version"?: components["schemas"]["NonEmptyStr"];
+      "status": components["schemas"]["ComparisonStatus"];
+      "upgrade_approved"?: false;
+    };
+    "ComparisonSample": {
+      "baseline": components["schemas"]["BenchSample"];
+      "baseline_guardrail_passed"?: boolean;
+      "candidate": components["schemas"]["BenchSample"];
+      "candidate_guardrail_passed"?: boolean;
+      "context": components["schemas"]["ContextLength"];
+      "notes"?: components["schemas"]["NonEmptyStr"][];
+    };
+    "ComparisonStatus": "awaiting_evidence" | "improved" | "regressed" | "inconclusive" | "incompatible";
     "CompletionResponse": {
       "command_id": components["schemas"]["Identifier"];
       "experiment_state"?: string | null;
@@ -203,6 +279,16 @@ export interface components {
       "sample_count": number;
       "upper": number;
     };
+    "ContextComparisonResult": {
+      "context": components["schemas"]["ContextLength"];
+      "improvement_pct"?: number | null;
+      "interval"?: components["schemas"]["ConfidenceInterval"] | null;
+      "reasons"?: components["schemas"]["NonEmptyStr"][];
+      "sample_count"?: number;
+      "score"?: number | null;
+      "status": components["schemas"]["ContextComparisonStatus"];
+    };
+    "ContextComparisonStatus": "improved" | "regressed" | "inconclusive";
     "ContextEvaluation": {
       "baseline_candidate_id"?: components["schemas"]["Identifier"] | null;
       "baseline_observation_id"?: components["schemas"]["Identifier"] | null;
@@ -440,6 +526,32 @@ export interface components {
       "worker_id": components["schemas"]["Identifier"];
     };
     "Identifier": string;
+    "ImpactAssessment": {
+      "applicable": boolean;
+      "assessment_id": components["schemas"]["NonEmptyStr"];
+      "candidate_engine_sha256"?: components["schemas"]["Sha256"] | null;
+      "capability_diff"?: components["schemas"]["CapabilityDiff"];
+      "changed_areas"?: components["schemas"]["ChangedArea"][];
+      "created_at"?: components["schemas"]["AwareTimestamp"];
+      "current_engine"?: components["schemas"]["EngineIdentity"] | null;
+      "engine_id": components["schemas"]["EngineId"];
+      "gpu_uuids"?: components["schemas"]["NonEmptyStr"][];
+      "impact": components["schemas"]["ImpactClass"];
+      "inventory_digest"?: components["schemas"]["Sha256"] | null;
+      "inventory_fresh"?: boolean;
+      "inventory_snapshot_revision"?: components["schemas"]["NonNegativeInt"];
+      "model_digest"?: components["schemas"]["Sha256"] | null;
+      "model_id"?: components["schemas"]["NonEmptyStr"] | null;
+      "model_identity_complete"?: boolean;
+      "notice_id": components["schemas"]["NonEmptyStr"];
+      "policy_version"?: components["schemas"]["NonEmptyStr"];
+      "reasons"?: components["schemas"]["NonEmptyStr"][];
+      "recommended_action": components["schemas"]["RecommendedAction"];
+      "requires_ab": boolean;
+      "requires_smoke": boolean;
+      "schema_version"?: components["schemas"]["NonEmptyStr"];
+      "worker_id": components["schemas"]["NonEmptyStr"];
+    };
     "ImpactClass": "P0" | "P1" | "P2";
     "JobCounters": {
       "candidates_completed"?: components["schemas"]["NonNegativeInt"];
@@ -715,6 +827,7 @@ export interface components {
       "recipe_id": components["schemas"]["Identifier"];
       "status": string;
     };
+    "RecommendedAction": "ignore" | "smoke_test" | "targeted_rerun" | "full_rerun";
     "ReconcilePayload": {
       "kind"?: "RECONCILE";
       "study_id": components["schemas"]["Identifier"];
@@ -728,6 +841,66 @@ export interface components {
       "study_name": components["schemas"]["NonEmptyStr"];
       "total_trials": components["schemas"]["NonNegativeInt"];
     };
+    "ReleaseAsset": {
+      "name": components["schemas"]["NonEmptyStr"];
+      "platform"?: components["schemas"]["NonEmptyStr"] | null;
+      "sha256"?: components["schemas"]["Sha256"] | null;
+      "size_bytes"?: components["schemas"]["NonNegativeInt"] | null;
+      "url"?: components["schemas"]["NonEmptyStr"] | null;
+    };
+    "ReleaseCheckRequest": {
+      "model_id"?: components["schemas"]["NonEmptyStr"] | null;
+      "release": components["schemas"]["ReleaseMetadata"];
+      "worker_id": components["schemas"]["Identifier"];
+    };
+    "ReleaseCheckResponse": {
+      "assessment": components["schemas"]["ImpactAssessment"];
+      "notice": components["schemas"]["ReleaseNoticeView"];
+      "result": "imported" | "reused" | "already_installed";
+    };
+    "ReleaseDecision": "pending" | "pinned" | "deferred" | "comparison_requested";
+    "ReleaseDecisionRequest": {
+      "action": "pin" | "defer";
+      "note"?: components["schemas"]["NonEmptyStr"] | null;
+    };
+    "ReleaseDetailResponse": {
+      "assessments"?: components["schemas"]["ImpactAssessment"][];
+      "comparisons"?: components["schemas"]["ComparisonPlan"][];
+      "notice": components["schemas"]["ReleaseNoticeView"];
+    };
+    "ReleaseListResponse": {
+      "notices": components["schemas"]["ReleaseNoticeView"][];
+      "total": components["schemas"]["NonNegativeInt"];
+    };
+    "ReleaseMetadata": {
+      "affected_model_families"?: components["schemas"]["NonEmptyStr"][];
+      "artifact_sha256"?: components["schemas"]["Sha256"] | null;
+      "assets"?: components["schemas"]["ReleaseAsset"][];
+      "backend"?: components["schemas"]["Backend"];
+      "build": components["schemas"]["NonEmptyStr"];
+      "capability_manifest"?: components["schemas"]["EngineCapabilityManifest"] | null;
+      "changed_areas"?: components["schemas"]["ChangedArea"][];
+      "changed_paths"?: components["schemas"]["NonEmptyStr"][];
+      "changelog"?: components["schemas"]["NonEmptyStr"] | null;
+      "engine_id": components["schemas"]["EngineId"];
+      "executable_id"?: components["schemas"]["NonEmptyStr"] | null;
+      "notes"?: components["schemas"]["NonEmptyStr"][];
+      "released_at": components["schemas"]["AwareTimestamp"];
+      "source"?: components["schemas"]["ReleaseSource"];
+      "source_commit"?: components["schemas"]["NonEmptyStr"] | null;
+      "source_url"?: components["schemas"]["NonEmptyStr"] | null;
+      "version": components["schemas"]["NonEmptyStr"];
+    };
+    "ReleaseNoticeView": {
+      "decision": components["schemas"]["ReleaseDecision"];
+      "decision_at"?: components["schemas"]["AwareTimestamp"] | null;
+      "decision_note"?: string | null;
+      "imported_at": components["schemas"]["AwareTimestamp"];
+      "metadata_digest": components["schemas"]["Sha256"];
+      "notice_id": components["schemas"]["Identifier"];
+      "release": components["schemas"]["ReleaseMetadata"];
+    };
+    "ReleaseSource": "offline_import" | "manual" | "github_release";
     "ResourceConstraints": {
       "allow_quality_changing_flags"?: boolean;
       "max_system_ram_bytes"?: components["schemas"]["PositiveInt"] | null;
@@ -972,6 +1145,53 @@ export interface components {
 }
 
 export interface operations {
+  "list_all_comparisons_api_v1_comparisons_get": {
+    method: "GET";
+    parameters: {
+      "notice_id"?: string | null;
+      "authorization"?: string | null;
+    };
+    requestBody: never;
+    responses: {
+    "200": components["schemas"]["ComparisonListResponse"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
+  "propose_api_v1_comparisons_post": {
+    method: "POST";
+    parameters: {
+      "authorization"?: string | null;
+    };
+    requestBody: components["schemas"]["ComparisonCreateRequest"];
+    responses: {
+    "201": components["schemas"]["ComparisonPlan"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
+  "get_one_comparison_api_v1_comparisons__comparison_id__get": {
+    method: "GET";
+    parameters: {
+      "comparison_id": string;
+      "authorization"?: string | null;
+    };
+    requestBody: never;
+    responses: {
+    "200": components["schemas"]["ComparisonPlan"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
+  "evaluate_api_v1_comparisons__comparison_id__evidence_post": {
+    method: "POST";
+    parameters: {
+      "comparison_id": string;
+      "authorization"?: string | null;
+    };
+    requestBody: components["schemas"]["ComparisonEvidenceRequest"];
+    responses: {
+    "200": components["schemas"]["ComparisonPlan"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
   "list_all_api_v1_experiments_get": {
     method: "GET";
     parameters: {
@@ -1234,6 +1454,52 @@ export interface operations {
     "422": components["schemas"]["HTTPValidationError"];
   };
   };
+  "list_all_api_v1_releases_get": {
+    method: "GET";
+    parameters: {
+      "authorization"?: string | null;
+    };
+    requestBody: never;
+    responses: {
+    "200": components["schemas"]["ReleaseListResponse"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
+  "check_release_api_v1_releases_check_post": {
+    method: "POST";
+    parameters: {
+      "authorization"?: string | null;
+    };
+    requestBody: components["schemas"]["ReleaseCheckRequest"];
+    responses: {
+    "200": components["schemas"]["ReleaseCheckResponse"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
+  "get_one_api_v1_releases__notice_id__get": {
+    method: "GET";
+    parameters: {
+      "notice_id": string;
+      "authorization"?: string | null;
+    };
+    requestBody: never;
+    responses: {
+    "200": components["schemas"]["ReleaseDetailResponse"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
+  "decide_api_v1_releases__notice_id__decision_post": {
+    method: "POST";
+    parameters: {
+      "notice_id": string;
+      "authorization"?: string | null;
+    };
+    requestBody: components["schemas"]["ReleaseDecisionRequest"];
+    responses: {
+    "200": components["schemas"]["ReleaseDetailResponse"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
   "status_api_v1_status_get": {
     method: "GET";
     parameters: {
@@ -1399,6 +1665,16 @@ export interface operations {
 }
 
 export interface paths {
+  "/api/v1/comparisons": {
+    get: operations["list_all_comparisons_api_v1_comparisons_get"];
+    post: operations["propose_api_v1_comparisons_post"];
+  };
+  "/api/v1/comparisons/{comparison_id}": {
+    get: operations["get_one_comparison_api_v1_comparisons__comparison_id__get"];
+  };
+  "/api/v1/comparisons/{comparison_id}/evidence": {
+    post: operations["evaluate_api_v1_comparisons__comparison_id__evidence_post"];
+  };
   "/api/v1/experiments": {
     get: operations["list_all_api_v1_experiments_get"];
     post: operations["create_api_v1_experiments_post"];
@@ -1457,6 +1733,18 @@ export interface paths {
   };
   "/api/v1/recipes/{recipe_id}/verify": {
     post: operations["verify_api_v1_recipes__recipe_id__verify_post"];
+  };
+  "/api/v1/releases": {
+    get: operations["list_all_api_v1_releases_get"];
+  };
+  "/api/v1/releases/check": {
+    post: operations["check_release_api_v1_releases_check_post"];
+  };
+  "/api/v1/releases/{notice_id}": {
+    get: operations["get_one_api_v1_releases__notice_id__get"];
+  };
+  "/api/v1/releases/{notice_id}/decision": {
+    post: operations["decide_api_v1_releases__notice_id__decision_post"];
   };
   "/api/v1/status": {
     get: operations["status_api_v1_status_get"];

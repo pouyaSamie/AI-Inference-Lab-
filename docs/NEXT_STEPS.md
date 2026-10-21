@@ -4,51 +4,58 @@ Last updated: 2026-10-21.
 
 ## Current state
 
-Phases 0/1/2/3/4/5/6 are committed locally. Phase 6 adds the secure
-Electron/React operator console and a locally built Debian package. It is
-verified offline/unit/typecheck/build/package only. No full GUI run against a
-live controller and worker has been performed.
+Phases 0/1/2/3/4/5/6/7 are committed locally. Phase 7 adds offline release
+intelligence: deterministic impact classification, durable notices and
+assessments, pin/defer decisions and frozen paired A/B records. It is verified
+offline/unit/typecheck/build only. No full GUI run against a live controller and
+worker has been performed.
 
 No real preflight or trial has been run, no model has been fully hashed, and no
-validated real recipe exists. Simulated and demo evidence remain
-non-promotable.
+validated real recipe exists. No real A/B comparison has been executed against
+an installed candidate. Simulated and demo evidence remain non-promotable.
 
 Read `docs/progress/PHASE_2_REPORT.md` through
-`docs/progress/PHASE_6_REPORT.md` for evidence and
+`docs/progress/PHASE_7_REPORT.md` for evidence and
 `docs/IMPLEMENTATION_STATUS.md` for the complete status table.
 
-## Completed — Phase 6
+## Completed — Phase 7
 
-- Added `apps/desktop`: an Electron 40 + React 19 + TypeScript + Vite operator
-  console outside the pnpm workspace.
-- Implemented all ten primary screens: Overview, Models, Engines, Workers,
-  Optimize, Live Runs, Compare, Recipes, Updates and Settings.
-- Added generated-contract aliases, a typed API client, SSE parsing/reconnect,
-  polling hooks, SVG charts, report export and explicit offline fixtures.
-- Optimize uses the existing snapshot-only plan endpoint and six-step immutable
-  plan submission; it does not perform a live worker call during planning.
-- Compare renders paired confidence intervals, per-context winners, incomplete
-  coverage and `VALIDATED_WINNER` / `NO_VALIDATED_WINNER` / `SIMULATED`
-  without inferring a winner from throughput.
-- Added secure Electron main/preload boundaries: `lab://app` plus strict CSP,
-  sandbox/context isolation, blocked navigation/permissions/webviews, denied
-  direct renderer network access, validated `/api/v1` IPC proxy, SSE bridge and
-  native bounded report save.
-- The renderer never receives the bearer token. Tokens are stored via
-  safeStorage only when an encrypted, non-`basic_text` backend is available;
-  otherwise they remain in main-process memory for the session.
-- Hardware acceleration is disabled before ready. `LAB_DESKTOP_ENABLE_GPU=1` is
-  the explicit restart-requiring override, with contamination verification
-  required for shared-GPU qualification.
-- Added offline demo mode. Every demo screen is labelled and cannot create,
-  cancel or qualify real evidence.
-- Added a read-only worker snapshot endpoint for cached inventory views, with
-  API-flow coverage and regenerated contracts.
-- Added Vitest coverage for all screens, finalization labels, IPC validation,
-  report bounds, SSE parsing and API proxy authentication/size/error behavior.
-- Added `scripts/package-linux.mjs`, which builds an 84.0 MiB `.deb` from the
-  local Electron distribution using `dpkg-deb` without network access.
-- Added ADR 0016 documenting the UI/Electron security boundary.
+- Added `python/lab_updates`, a pure package for release metadata, deterministic
+  path/area classification, capability diffs, frozen A/B plans and evidence
+  evaluation. It performs no network, process, filesystem or hardware I/O.
+- Added an Alembic revision creating `release_notices`, `release_assessments`
+  and `engine_comparisons` (controller schema now 23 tables).
+- Added operator-only endpoints:
+  `POST /api/v1/releases/check`, `GET /api/v1/releases`,
+  `GET /api/v1/releases/{id}`, `POST /api/v1/releases/{id}/decision`,
+  `POST /api/v1/comparisons`, `GET /api/v1/comparisons`,
+  `GET /api/v1/comparisons/{id}` and
+  `POST /api/v1/comparisons/{id}/evidence`.
+- Classification is deterministic and conservative: CUDA/backend/MoE/KV/
+  context/model-loader are P0; scheduling/threading/batching/server API are P1;
+  docs/tests are P2. Unknown paths are P1 and require smoke testing. Capability
+  diffs can raise impact. Stale inventory can raise P2 to P1. Missing installed
+  engine identity makes a release non-applicable.
+- Import is offline. Repeated metadata reuses the durable notice; assessment IDs
+  bind notice, worker/model digest, installed executable hash, inventory
+  revision and policy version. No upstream call, artifact download or installed
+  file mutation occurs.
+- A/B creation requires an applicable P0/P1 assessment, complete verified model
+  identity hashes and candidate executable SHA-256. It freezes baseline/candidate
+  identities, model digest, worker, workload, contexts, margin and confidence
+  level. Missing hashes return `409`.
+- Evidence is immutable: identical terminal evidence replays; different terminal
+  evidence returns `409`. Simulated/non-measured evidence is `INCOMPATIBLE`.
+  Missing contexts, identity mismatch, baseline guardrail failure and candidate
+  guardrail failure are handled explicitly. `upgrade_approved` is always `false`.
+- Replaced the Updates placeholder with a functional read-only review screen:
+  installed inventory, offline JSON import, assessment reasons, pin/defer,
+  A/B proposal and comparison intervals/results. It never downloads, launches,
+  installs or approves an update.
+- Added ADR 0017 documenting the offline, non-approving release boundary.
+- Regenerated OpenAPI/JSON-Schema/manifest/TypeScript contracts and added
+  `ImpactAssessment`, `ReleaseMetadata`, `ComparisonPlan` and
+  `ComparisonEvidence` schemas.
 
 Verification run:
 
@@ -65,33 +72,25 @@ npm --prefix apps/desktop run package:linux
 systemd-analyze verify packaging/systemd/lab-*.service
 ```
 
-The `.deb` was inspected and its packaged Electron binary was smoke-launched
-with `--no-sandbox`; normal sandboxed launch from the cached development
-Electron install failed because its `chrome-sandbox` helper is user-owned mode
-`755`. The archive records root:root mode `4755`, but the package was not
-installed. AppImage packaging and signing are deferred.
+`uv run pytest -q` includes the release core/API/migration tests. The A/B test
+asserts that the installed snapshot engine hashes and model records are
+unchanged by the full import/assessment/comparison workflow.
 
-## Immediate work — Phase 7
+## Immediate work — Phase 8
 
-Phase 7 is release intelligence. It must remain read-only/opt-in and must never
-mutate an installed engine, model or the current recipe.
+Phase 8 is hardening/release work. It is not started and remains approval-gated:
 
-- Add a persisted update-notice model and capability-diff format.
-- Support importing release metadata from an offline fixture or an explicitly
-  enabled outbound source. No engine artifact download and no execution.
-- Compare the reported release surface with the observed installed build:
-  version/build/commit, flags, model compatibility, context limits and
-  unsupported/renamed commands.
-- Classify impact as compatible, requires targeted rerun, incompatible or
-  unknown. Missing evidence is `unknown`, never compatible by default.
-- Produce a paired old/new benchmark plan for operator approval, without
-  replacing the current engine. A rejected update must leave current engine
-  fingerprints, recipes and evidence untouched.
-- Persist pin/defer/qualify decisions and audit events.
-- Wire release notices into the Updates screen as read-only information. The UI
-  must not auto-update Electron or engines.
-- Add offline tests for capability diffs, impact classification, approval gates,
-  non-mutation and rollback/rejection state.
+- security and resilience tests (concurrency, crash reconciliation, event-loop
+  latency, adversarial IPC/navigation payloads);
+- a real hardware matrix and representative long-context runs with version/
+  driver provenance;
+- runbooks for installation, upgrade, rollback, restore and uninstall;
+- installer signing, `.deb` installation/upgrade testing and AppImage tooling;
+- end-to-end acceptance with pinned manifests on target hosts;
+- real release A/B execution, if an approved candidate binary is available.
+
+Remote release polling and artifact download remain deferred even after Phase 8
+unless separately reviewed and explicitly enabled.
 
 ## Pending operator approvals
 

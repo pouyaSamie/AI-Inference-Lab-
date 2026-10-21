@@ -10,6 +10,7 @@ members = [
     "lab-bench",
     "lab-core",
     "lab-optimizer",
+    "lab-updates",
     "lab-worker",
 ]
 
@@ -230,6 +231,7 @@ dependencies = [
     { name = "lab-bench" },
     { name = "lab-core" },
     { name = "lab-optimizer" },
+    { name = "lab-updates" },
     { name = "lab-worker" },
 ]
 
@@ -252,6 +254,7 @@ requires-dist = [
     { name = "lab-bench", editable = "python/lab_bench" },
     { name = "lab-core", editable = "python/lab_core" },
     { name = "lab-optimizer", editable = "python/lab_optimizer" },
+    { name = "lab-updates", editable = "python/lab_updates" },
     { name = "lab-worker", editable = "python/lab_worker" },
 ]
 
@@ -301,6 +304,7 @@ dependencies = [
     { name = "lab-adapters" },
     { name = "lab-bench" },
     { name = "lab-core" },
+    { name = "lab-updates" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy" },
@@ -314,6 +318,7 @@ requires-dist = [
     { name = "lab-adapters", editable = "python/lab_adapters" },
     { name = "lab-bench", editable = "python/lab_bench" },
     { name = "lab-core", editable = "python/lab_core" },
+    { name = "lab-updates", editable = "python/lab_updates" },
     { name = "pydantic", specifier = ">=2.9,<3" },
     { name = "pydantic-settings", specifier = ">=2.4,<3" },
     { name = "sqlalchemy", specifier = ">=2.0.30,<3" },
@@ -369,6 +374,21 @@ requires-dist = [
     { name = "optuna", specifier = ">=4.0,<5" },
     { name = "pydantic", specifier = ">=2.9,<3" },
     { name = "sqlalchemy", specifier = ">=2.0.30,<3" },
+]
+
+[[package]]
+name = "lab-updates"
+version = "0.1.0"
+source = { editable = "python/lab_updates" }
+dependencies = [
+    { name = "lab-core" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "lab-core", editable = "python/lab_core" },
+    { name = "pydantic", specifier = ">=2.9,<3" },
 ]
 
 [[package]]

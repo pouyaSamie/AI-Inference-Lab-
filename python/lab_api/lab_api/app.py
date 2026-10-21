@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import Settings, get_settings
 from .db import create_controller_engine, create_session_factory
-from .routers import experiments, optimizer_internal, recipes, system, workers
+from .routers import experiments, optimizer_internal, recipes, releases, system, workers
 from .services.runtime import RuntimeScheduler
 
 logger = logging.getLogger("lab_api")
@@ -196,6 +196,7 @@ def create_app(
     app.include_router(experiments.router)
     app.include_router(optimizer_internal.router)
     app.include_router(recipes.router)
+    app.include_router(releases.router)
 
     @app.get("/api/v1/meta", include_in_schema=False)
     def meta() -> dict[str, str]:

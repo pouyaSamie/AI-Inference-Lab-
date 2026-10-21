@@ -10,9 +10,9 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 | Area | Status | Evidence / boundary |
 |---|---|---|
 | Phase 0 engine reconnaissance | Partial | llama.cpp and Strata version/help are captured as sanitized fixtures. The installed builds were also probed live in Phase 2. No 4K/32K benchmark or second-GPU comparison exists. See `docs/PHASE_0_FINDINGS.md`. |
-| Python `uv` workspace | Implemented | Six workspace packages resolve with `uv sync --all-packages`. |
+| Python `uv` workspace | Implemented | Seven workspace packages resolve with `uv sync --all-packages`. |
 | Frozen contracts | Implemented | Pydantic v2 frozen models in `lab_core`; canonical JSON/SHA-256 in `lab_core.ids`. Execution plans include `generated_files`. |
-| Controller persistence | Implemented | FastAPI + SQLAlchemy 2.x + SQLite WAL + Alembic; initial revision `b151f9870480`. |
+| Controller persistence | Implemented | FastAPI + SQLAlchemy 2.x + SQLite WAL + Alembic; revision head `9f2a7c1e4b6d` creates 23 tables, including durable release notices, assessments and comparisons. |
 | Separate optimizer process | Implemented | `lab_optimizer` owns Optuna and a distinct SQLite URL. FastAPI imports no Optuna. |
 | Durable worker protocol | Implemented | Poll, lease, ack, renewal, complete, idempotent replay, conflict `409`, lease expiry/requeue. |
 | Engine adapters | Implemented, pure | llama.cpp and Strata help/JSON parsers, typed validation and plan builders, productionized against the installed builds. No subprocess/network/filesystem I/O; a test enforces imports. |
@@ -27,10 +27,10 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 | SSE | Implemented | Initial `snapshot`, sequenced events, `event.gap` for stale `Last-Event-ID`, bounded page endpoint. |
 | Generated contracts | Implemented, checked in | OpenAPI, JSON Schema/manifest and strict TypeScript declarations; offline generation and drift gate. |
 | systemd packaging | Authored, not installed | Three service units plus an environment template and security notes under `packaging/systemd/`. |
-| Electron/React UI | Implemented, verified offline | Ten primary screens, generated TypeScript contracts, offline demo fixtures, SSE replay, secure Electron main/preload, validated IPC API/SSE proxy and native report save. Unit tests, typecheck, production build and a local `.deb` build pass. No full GUI live-controller run yet. |
+| Electron/React UI | Implemented, verified offline | Ten primary screens, generated TypeScript contracts, offline demo fixtures, SSE replay, secure Electron main/preload, validated IPC API/SSE proxy and native report save. Updates now imports offline release metadata, shows impact/decisions and displays non-approving A/B results. Unit tests, typecheck, production build and a local `.deb` build pass. No full GUI live-controller run yet. |
 | Desktop packaging | Built, not installed | `apps/desktop/scripts/package-linux.mjs` builds a `.deb` from the installed Electron distribution using `dpkg-deb`; `chrome-sandbox` is root-owned mode 4755 in the archive. Installation, signing, upgrade/rollback and AppImage remain Phase 8. |
 | Tokenizer-backed workloads | Implemented, offline | Frozen `lab-synthetic-v1` corpus, engine tokenizer fitting, prompt-level ladder, repeated-primary medians and near-capacity truncation checks. No live serving run yet. |
-| Update intelligence / release qualification | Not implemented | Phase 7/8. |
+| Release intelligence | Implemented, offline only | Pure `lab_updates` metadata/classification/evaluation; durable notices, assessments and A/B comparisons; deterministic P0/P1/P2 and capability diffs; pin/defer decisions; immutable evidence with `409` conflicts; non-approving results. No remote polling, artifact download, installation or real A/B execution. |
 
 ## 2. Runtime components
 
@@ -74,10 +74,45 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 - Hardware acceleration is disabled before ready. `LAB_DESKTOP_ENABLE_GPU=1` is
   an explicit restart-requiring override; shared-GPU qualification then needs
   contamination verification.
-- Updates is a truthful later-phase boundary: it never checks, downloads,
-  replaces or installs an engine/model.
+- Updates imports approved release metadata offline, displays P0/P1/P2 impact,
+  reasons, stale-inventory and candidate-hash blockers, supports pin/defer
+  decisions and requests a frozen A/B proposal. It renders per-context intervals
+  and explicitly shows that `upgrade_approved` is false. It never checks an
+  upstream feed, downloads, replaces, launches or installs an engine/model.
 
-## 4. Real worker behavior
+## 4. Release intelligence behavior
+
+- `python/lab_updates` is pure: it imports no network, process, filesystem or
+  hardware modules. It defines frozen release metadata, deterministic path/area
+  classification, capability diffs, frozen A/B plans and evidence evaluation.
+- `POST /api/v1/releases/check` imports operator-supplied metadata and never
+  contacts an upstream service or artifact host. A repeated metadata digest
+  returns the existing notice; assessments bind notice, worker/model digest,
+  installed executable hash, inventory revision and policy version.
+- CUDA/backend/MoE/KV/context/model-loader paths are P0;
+  scheduling/threading/batching/server API are P1; docs/tests are P2. Unknown
+  paths are P1 and require smoke testing. Stale inventory can raise P2 to P1.
+  Missing installed-engine identity makes the release non-applicable.
+- Notices can be pinned or deferred with an audit event. `GET
+  /api/v1/releases` and `GET /api/v1/releases/{id}` expose stored notices,
+  assessments and comparisons; no endpoint mutates an installed artifact.
+- `POST /api/v1/comparisons` requires an applicable P0/P1 assessment, a
+  complete verified model identity digest (`model_identity_complete=true`), the
+  candidate executable SHA-256 and the selected worker/model. It freezes both engine identities, workload,
+  contexts and thresholds. Missing hashes or incomplete model hashes return
+  `409`.
+- `POST /api/v1/comparisons/{id}/evidence` accepts paired measured samples.
+  Identical terminal evidence is replay-safe; different terminal evidence is
+  `409`. Simulated or non-measured evidence is `INCOMPATIBLE`; missing contexts,
+  identity mismatches and baseline guardrail failure are also incompatible.
+  Candidate guardrail failure and significant regression retain the current
+  engine. `upgrade_approved` is always `false`.
+- A regression test asserts that the installed snapshot engine hashes and model
+  records are unchanged by the complete import/assessment/comparison workflow.
+- No real A/B evidence exists yet. No comparison has been executed against an
+  installed candidate, and no update has been downloaded or installed.
+
+## 5. Real worker behavior
 
 ### Discovery
 
@@ -161,7 +196,7 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 - Simulated, character-fallback, screening-only, native-only and
   hash-incomplete evidence remain ineligible.
 
-## 5. Verification actually performed
+## 6. Verification actually performed
 
 The following commands were run in this workspace on 2026-10-21 and produced the
 results shown. They must be re-run after any change.
@@ -171,13 +206,13 @@ uv run ruff check
 # All checks passed!
 
 uv run ruff format --check
-# 110 files already formatted
+# 118 files already formatted
 
 uv run mypy python
-# Success: no issues found in 92 source files
+# Success: no issues found in 97 source files
 
 uv run pytest -q
-# 49 passed in 9.16s
+# 66 passed in 10.92s
 
 uv run python scripts/check_contracts.py
 # contracts are current
@@ -186,13 +221,16 @@ pnpm typecheck
 # generated contracts tsc pass; desktop renderer/Electron tsc pass
 
 npm --prefix apps/desktop test
-# 8 test files, 27 tests passed
+# 9 test files, 29 tests passed
 
 npm --prefix apps/desktop run build
 # Vite production renderer + Electron main/preload build passed
+# dist/assets/index-CQZMYOhX.js 336.50 kB (gzip 97.12 kB)
+# dist/assets/index-DRtlQKTH.css 22.81 kB (gzip 5.15 kB)
 
 npm --prefix apps/desktop run package:linux
 # built ai-inference-lab-desktop_0.1.0_amd64.deb (84.0 MiB)
+# sha256 8eb33620715678312a4a3908101d5a545a0f500b6282c07c25e3202714c50c38
 ```
 
 The `.deb` was inspected with `dpkg-deb --info` and `dpkg-deb --contents`:
@@ -373,11 +411,12 @@ engines/models and GPU access; the simulated lane needs neither.
 
 ## 9. Next gate
 
-Phases 0/1 through 6 are committed locally. Phase 6 adds the secure desktop
-operator UI and a locally built `.deb`; it does not add release intelligence.
-The open evidence items remain unchanged: full model/source-shard hashing, a
-real preflight, one real low-impact tokenized trial and a real near-capacity
-context check must run before any real validated recipe can exist. A UI run is
-also still required against a live controller/worker and must be explicitly
-approved. See `docs/NEXT_STEPS.md` and the phase reports under
+Phases 0/1 through 7 are committed locally. Phase 7 adds offline release
+intelligence and frozen A/B records; it does not execute a candidate, download
+an artifact or approve an upgrade. The open evidence items remain unchanged:
+full model/source-shard hashing, a real preflight, one real low-impact tokenized
+trial, a real near-capacity context check and a real measured A/B run must
+happen before any real validated recipe or upgrade recommendation can exist. A
+UI run is also still required against a live controller/worker and must be
+explicitly approved. See `docs/NEXT_STEPS.md` and the phase reports under
 `docs/progress/`.
