@@ -434,8 +434,8 @@ installed Electron distribution and compiled renderer/main assets without
 downloading anything. It sets `chrome-sandbox` to root-owned mode 4755 and
 installs an application launcher, desktop entry and icon. Building the `.deb`
 is verified; installation, signing, upgrade/rollback and AppImage packaging
-remain Phase 8 release-hardening work requiring approval. A packaged build is
-not benchmark evidence.
+remain approval-gated, with the reviewed procedure in `docs/RUNBOOK.md`. A
+packaged build is not benchmark evidence.
 
 ## 16. Release intelligence (Phase 7)
 
@@ -464,8 +464,8 @@ Unknown paths are P1 and force smoke testing. Stale inventory can raise a P2
 result to P1. A missing installed engine makes the release non-applicable. A
 comparison requires the candidate executable SHA-256 and complete model hashes,
 and missing/extra contexts, mismatched identity, simulation, non-measured status
-or baseline guardrail failure is incompatible. A candidate guardrail failure or significant regression
-retains the current engine.
+or baseline guardrail failure is incompatible. A candidate guardrail failure or
+significant regression retains the current engine.
 
 No endpoint fetches upstream metadata, downloads an artifact, starts a candidate
 binary or writes under an engine/model root. The Electron Updates screen only
@@ -473,7 +473,38 @@ imports JSON, records decisions and displays assessments/comparisons; it cannot
 install or approve an engine. Remote polling, artifact download and installation
 remain deferred and approval-gated.
 
-## 17. Phase boundary
+## 17. Offline operational hardening (Phase 8)
+
+Phase 8 adds operator-controlled recovery and release procedures without
+weakening the runtime boundaries:
+
+- **Credential scoping.** Regression tests prove `/health`/`/ready` are the only
+  public routes, operator/worker/optimizer tokens are not interchangeable and a
+  disabled worker cannot poll, heartbeat or read a snapshot. Electron IPC,
+  navigation and URL validation remain covered separately.
+- **Two-store backup.** `lab_api.backup` uses SQLite's online backup API, writes
+  a versioned manifest with basenames, sizes, SHA-256 digests and
+  `PRAGMA user_version`, and verifies `PRAGMA integrity_check`. It never opens a
+  network connection and never records absolute source paths.
+- **Offline restore.** Restore refuses active WAL/shm sidecars, refuses an
+  existing target unless replacement is explicit, and first snapshots the
+  existing target as `*.pre-restore-<timestamp>.sqlite3`. Services must be
+  stopped; there is no online restore path and no controller endpoint that can
+  delete or replace a store.
+- **Runbook.** Installation, systemd enablement, enrollment, desktop package,
+  upgrade/rollback, backup/restore, uninstall/data retention and live acceptance
+  are operator procedures requiring approval. The package has no maintainer
+  script that deletes databases, worker state, models or engines.
+- **Acceptance matrix.** `docs/ACCEPTANCE_MATRIX.md` records AC-01…AC-44 as
+  offline-verified, partial, authored-only, blocked or not demonstrated. The
+  Phase 8 exit gate is explicitly unmet until target-host acceptance with pinned
+  manifests is recorded.
+
+These are offline hardening controls. They do not prove a live install, a full
+model hash scan, real engine performance, full-context allocation, hardware
+matrix coverage, a packaged GUI session or a real release A/B.
+
+## 18. Phase boundary
 
 Phases 0/1 prove protocol, persistence, planning, lifecycle, recovery and
 pure-adapter behavior. Phase 2 proves the worker-owned process, discovery, GPU
@@ -484,5 +515,7 @@ source-shard identity. Phase 5 adds paired baselines, retained samples,
 statistical finalization and the recipe qualification gate. Phase 6 adds the
 secure desktop operator UI and a locally built `.deb`. Phase 7 adds offline
 release impact assessment and frozen A/B records without installing anything.
-None of these offline checks prove real llama.cpp/Strata performance or create a
-real validated recipe without an approved live run.
+Phase 8 adds offline security, backup/restore and runbook hardening but does not
+close the live acceptance gate. None of these offline checks prove real
+llama.cpp/Strata performance or create a real validated recipe without an
+approved live run.

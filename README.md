@@ -1,10 +1,11 @@
 # AI Inference Optimization Lab
 
-Phase 7 foundation for a local-first inference optimization controller,
-supervised Optuna process, durable Linux worker protocol, conformance-tested
-llama.cpp/Strata adapters, tokenizer-backed benchmark workloads, paired
-statistical finalization, offline release intelligence and a secure
-Electron/React operator console.
+Phase 7 foundation plus a Phase 8 offline-hardening increment for a local-first
+inference optimization controller, supervised Optuna process, durable Linux
+worker protocol, conformance-tested llama.cpp/Strata adapters,
+tokenizer-backed benchmark workloads, paired statistical finalization, offline
+release intelligence, secure Electron/React operator console and verified
+offline backup/restore tooling.
 
 > **The execution lanes are separate.** `lab-worker-sim` produces deterministic
 > simulated observations marked `simulated=true`; those can never qualify a
@@ -32,7 +33,10 @@ Electron/React operator console.
 The authoritative specification is [`docs/prd.md`](docs/prd.md). Architecture
 and decisions are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
 [`docs/ADR/`](docs/ADR/). Implementation status is recorded in
-[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md). Operations,
+upgrade/rollback, restore and live acceptance are in
+[`docs/RUNBOOK.md`](docs/RUNBOOK.md). The AC-01…AC-44 evidence and blocked
+gates are recorded in [`docs/ACCEPTANCE_MATRIX.md`](docs/ACCEPTANCE_MATRIX.md).
 
 ## Quick start
 
@@ -77,7 +81,8 @@ npm --prefix apps/desktop run package:linux
 locally installed Electron distribution using `dpkg-deb`; it performs no
 network download. The package is **built and inspected but not installed** in
 this workspace. Installation, signing, upgrade/rollback and AppImage packaging
-require operator approval and remain Phase 8 release-hardening work.
+require operator approval; `docs/RUNBOOK.md` records the reviewed procedure but
+the Phase 8 live gate remains unmet.
 
 The packaged renderer is served only through the privileged `lab://app`
 protocol with a strict CSP. The renderer has `contextIsolation` and `sandbox`,
@@ -103,6 +108,26 @@ GPU, model download or live inference server.
 The controller rejects an inventory that is not fresh by returning
 `202 PREFLIGHT_REQUIRED` and queueing a durable `SCAN`; it never performs a live
 worker call inside planning.
+
+## Backup and restore
+
+The controller and optimizer stores are backed up with SQLite's online backup
+API. The helper writes a verified manifest and refuses to overwrite an existing
+target without an explicit pre-restore snapshot:
+
+```bash
+uv run python scripts/backup_databases.py backup \
+  --controller /var/lib/ai-inference-lab/controller.sqlite3 \
+  --optimizer /var/lib/ai-inference-lab/optuna.sqlite3 \
+  --output /var/backups/ai-inference-lab/$(date -u +%Y%m%dT%H%M%SZ)
+
+uv run python scripts/backup_databases.py verify --backup /var/backups/...
+```
+
+Restore is an offline operation: stop controller, optimizer and worker first,
+then use `restore --backup ... --label controller --target ... --replace`.
+Never run it against a live database. See `docs/RUNBOOK.md` for the complete
+procedure, including retention and explicit deletion rules.
 
 ## Contract generation
 

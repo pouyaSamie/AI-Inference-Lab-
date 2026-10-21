@@ -4,19 +4,20 @@ Last updated: 2026-10-21.
 
 ## Current state
 
-Phases 0/1/2/3/4/5/6/7 are committed locally. Phase 7 adds offline release
-intelligence: deterministic impact classification, durable notices and
-assessments, pin/defer decisions and frozen paired A/B records. It is verified
-offline/unit/typecheck/build only. No full GUI run against a live controller and
-worker has been performed.
+Phases 0/1/2/3/4/5/6/7 and the Phase 8 offline-hardening increment are
+committed locally. Phase 7 adds offline release intelligence. Phase 8 adds
+credential-scope tests, verified two-store SQLite backup/restore, an operations
+runbook and an honest AC-01…AC-44 acceptance matrix. It is verified
+offline/unit/typecheck/build only. The Phase 8 exit gate — target-host
+acceptance with pinned manifests — is **not met**.
 
 No real preflight or trial has been run, no model has been fully hashed, and no
 validated real recipe exists. No real A/B comparison has been executed against
 an installed candidate. Simulated and demo evidence remain non-promotable.
 
 Read `docs/progress/PHASE_2_REPORT.md` through
-`docs/progress/PHASE_7_REPORT.md` for evidence and
-`docs/IMPLEMENTATION_STATUS.md` for the complete status table.
+`docs/progress/PHASE_8_REPORT.md` for evidence, `docs/ACCEPTANCE_MATRIX.md` for
+AC status and `docs/IMPLEMENTATION_STATUS.md` for the complete status table.
 
 ## Completed — Phase 7
 
@@ -76,18 +77,40 @@ systemd-analyze verify packaging/systemd/lab-*.service
 asserts that the installed snapshot engine hashes and model records are
 unchanged by the full import/assessment/comparison workflow.
 
-## Immediate work — Phase 8
+## Completed — Phase 8 offline hardening
 
-Phase 8 is hardening/release work. It is not started and remains approval-gated:
+- Added `tests/test_security_hardening.py`: public health only, credential
+  scoping, separate enrollment and disabled-worker rejection.
+- Added `lab_api.backup` and `scripts/backup_databases.py`: online two-store
+  backup, manifest SHA-256/size/integrity verification and offline restore with
+  a pre-restore snapshot. Tests cover tamper detection, existing-target
+  preservation, unsafe labels and WAL/shm refusal.
+- Fixed a flaky synthetic measured-recipe fixture so candidate samples derive
+  from the paired baseline rather than assuming a simulated candidate was
+  already near baseline.
+- Added `docs/RUNBOOK.md`, `docs/ACCEPTANCE_MATRIX.md`, ADR 0018 and the Phase 8
+  report.
+- Rebuilt and inspected the `.deb`; no installation or privileged action was
+  performed.
 
-- security and resilience tests (concurrency, crash reconciliation, event-loop
-  latency, adversarial IPC/navigation payloads);
-- a real hardware matrix and representative long-context runs with version/
-  driver provenance;
-- runbooks for installation, upgrade, rollback, restore and uninstall;
-- installer signing, `.deb` installation/upgrade testing and AppImage tooling;
-- end-to-end acceptance with pinned manifests on target hosts;
-- real release A/B execution, if an approved candidate binary is available.
+## Remaining — Phase 8 live acceptance
+
+The following remain operator/approval-gated and must be recorded before the
+Phase 8 exit gate can be claimed:
+
+- install/enable systemd units and verify boot/logout survival;
+- install/upgrade/rollback the `.deb`, verify uninstall data retention, and
+  decide whether AppImage packaging is required;
+- run the full ~270 GiB model/source-shard hash scan, a real preflight and a
+  low-impact paired trial on the RTX 3060;
+- run representative long-context/full-context proof, including Strata, and
+  close the `INCONCLUSIVE` status;
+- run a full GUI session against a live controller/worker;
+- run a real hardware matrix if L40S access is available;
+- measure AC-31 concurrency, AC-33 event-loop/SSE latency, AC-42 24-hour
+  telemetry retention, AC-15 quality failure, AC-28 future adapter and AC-40
+  locked-keyring fallback;
+- execute and record a real release A/B if an approved candidate binary exists.
 
 Remote release polling and artifact download remain deferred even after Phase 8
 unless separately reviewed and explicitly enabled.
@@ -101,11 +124,12 @@ These actions need explicit approval and are not started:
 3. One paired baseline plus low-impact real candidate trial (4K context, short
    repetition) on an idle GPU.
 4. A full GUI run against a live controller/worker, and a packaged `.deb`
-   installation/upgrade test.
+   installation/upgrade/uninstall test.
 5. Any intensive multi-context benchmark campaign.
 6. Installing or enabling any systemd unit.
-7. Any download, engine replacement or model mutation (normally forbidden).
-8. AppImage tooling acquisition, signing or release publication.
+7. Restoring a production controller or optimizer database.
+8. Any download, engine replacement or model mutation (normally forbidden).
+9. AppImage tooling acquisition, signing or release publication.
 
 ## Real validation entry evidence
 

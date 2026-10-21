@@ -26,11 +26,15 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 | Recipe qualification | Implemented, rejects simulation and inconclusive evidence | Simulated or screening-only evidence returns `409`. Measured evidence must also have an eligible paired baseline, retained samples and a qualification decision before a recipe is built; accepted recipes are marked `validated`. No real recipe exists yet. |
 | SSE | Implemented | Initial `snapshot`, sequenced events, `event.gap` for stale `Last-Event-ID`, bounded page endpoint. |
 | Generated contracts | Implemented, checked in | OpenAPI, JSON Schema/manifest and strict TypeScript declarations; offline generation and drift gate. |
-| systemd packaging | Authored, not installed | Three service units plus an environment template and security notes under `packaging/systemd/`. |
+| systemd packaging | Authored, not installed | Three service units plus an environment template and security notes under `packaging/systemd/`; installation/boot acceptance is blocked and documented in `docs/RUNBOOK.md`. |
 | Electron/React UI | Implemented, verified offline | Ten primary screens, generated TypeScript contracts, offline demo fixtures, SSE replay, secure Electron main/preload, validated IPC API/SSE proxy and native report save. Updates now imports offline release metadata, shows impact/decisions and displays non-approving A/B results. Unit tests, typecheck, production build and a local `.deb` build pass. No full GUI live-controller run yet. |
-| Desktop packaging | Built, not installed | `apps/desktop/scripts/package-linux.mjs` builds a `.deb` from the installed Electron distribution using `dpkg-deb`; `chrome-sandbox` is root-owned mode 4755 in the archive. Installation, signing, upgrade/rollback and AppImage remain Phase 8. |
+| Desktop packaging | Built, not installed | `apps/desktop/scripts/package-linux.mjs` builds a `.deb` from the installed Electron distribution using `dpkg-deb`; `chrome-sandbox` is root-owned mode 4755 in the archive. Installation, signing, upgrade/rollback and AppImage remain approval-gated; see `docs/RUNBOOK.md`. |
 | Tokenizer-backed workloads | Implemented, offline | Frozen `lab-synthetic-v1` corpus, engine tokenizer fitting, prompt-level ladder, repeated-primary medians and near-capacity truncation checks. No live serving run yet. |
 | Release intelligence | Implemented, offline only | Pure `lab_updates` metadata/classification/evaluation; durable notices, assessments and A/B comparisons; deterministic P0/P1/P2 and capability diffs; pin/defer decisions; immutable evidence with `409` conflicts; non-approving results. No remote polling, artifact download, installation or real A/B execution. |
+| Security hardening | Implemented, verified offline | New tests prove public health only, operator/worker/optimizer credential scoping, separate enrollment and disabled-worker rejection. Existing Electron IPC/navigation tests remain. No live network/egress audit. |
+| SQLite backup/restore | Implemented, verified offline | Online two-store backup, versioned SHA-256/size manifest, integrity check, offline restore with pre-restore snapshot and WAL/shm refusal. CLI exercised on temporary files only; no production database touched. |
+| Operations runbook | Authored, not executed | `docs/RUNBOOK.md` covers install, systemd, enrollment, desktop package, upgrade/rollback, backup/restore, uninstall/data retention and live acceptance. Privileged steps remain approval-gated. |
+| Phase 8 live acceptance | Blocked | No systemd unit, `.deb` or production database was installed/restored; no target-host pinned-manifest acceptance, live GUI, hardware matrix or real release A/B. See `docs/ACCEPTANCE_MATRIX.md`. |
 
 ## 2. Runtime components
 
@@ -98,9 +102,9 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
   assessments and comparisons; no endpoint mutates an installed artifact.
 - `POST /api/v1/comparisons` requires an applicable P0/P1 assessment, a
   complete verified model identity digest (`model_identity_complete=true`), the
-  candidate executable SHA-256 and the selected worker/model. It freezes both engine identities, workload,
-  contexts and thresholds. Missing hashes or incomplete model hashes return
-  `409`.
+  candidate executable SHA-256 and the selected worker/model. It freezes both
+  engine identities, workload, contexts and thresholds. Missing hashes or
+  incomplete model hashes return `409`.
 - `POST /api/v1/comparisons/{id}/evidence` accepts paired measured samples.
   Identical terminal evidence is replay-safe; different terminal evidence is
   `409`. Simulated or non-measured evidence is `INCOMPATIBLE`; missing contexts,
@@ -206,13 +210,13 @@ uv run ruff check
 # All checks passed!
 
 uv run ruff format --check
-# 118 files already formatted
+# 122 files already formatted
 
 uv run mypy python
-# Success: no issues found in 97 source files
+# Success: no issues found in 98 source files
 
 uv run pytest -q
-# 66 passed in 10.92s
+# 73 passed in 11.72s (repeated three times)
 
 uv run python scripts/check_contracts.py
 # contracts are current
@@ -230,8 +234,14 @@ npm --prefix apps/desktop run build
 
 npm --prefix apps/desktop run package:linux
 # built ai-inference-lab-desktop_0.1.0_amd64.deb (84.0 MiB)
-# sha256 8eb33620715678312a4a3908101d5a545a0f500b6282c07c25e3202714c50c38
+# 88,126,518 bytes
+# sha256 7778d186170beb4ed978726fc15900ea0bb669b9b9515f00ffa72084a8ba7d1f
 ```
+
+The Phase 8 backup CLI was exercised on temporary SQLite files: `backup`
+created controller/optimizer copies and `manifest.json`, `verify` matched both
+digests, and `restore` produced a database containing the original row. The
+production stores were not opened.
 
 The `.deb` was inspected with `dpkg-deb --info` and `dpkg-deb --contents`:
 the control metadata, launcher, desktop entry, icon and packaged app resources

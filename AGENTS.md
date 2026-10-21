@@ -1,6 +1,7 @@
 # AGENTS.md — working rules for this repository
 
-This repository is the Phase 0/1/2/3/4/5/6/7 foundation of **AI Inference Optimization Lab**.
+This repository is the Phase 0/1/2/3/4/5/6/7 plus Phase 8 offline-hardening
+foundation of **AI Inference Optimization Lab**.
 The authoritative product contract is [`docs/prd.md`](docs/prd.md) (PRD v2.1).
 When code and prose disagree, the PRD and the frozen `lab_core` models win.
 
@@ -32,14 +33,21 @@ Implemented now:
   native bounded report save;
 - local Linux `.deb` packaging script using the installed Electron distribution
   and `dpkg-deb` (built/inspected, not installed);
-- systemd unit files and deployment documentation (authoring only, not installed).
+- systemd unit files and deployment documentation (authoring only, not installed);
+- verified offline two-store SQLite backup/verify/restore tooling and an
+  operator CLI (`scripts/backup_databases.py`);
+- credential-scope/revoked-worker security regression tests;
+- installation, upgrade, rollback, restore and uninstall runbook plus an
+  explicit AC-01…AC-44 acceptance matrix.
 
 Intentionally deferred: recipes from real evidence, remote/automatic release
 polling and artifact download, production systemd installation, full live GUI
 acceptance, AppImage packaging, installer signing and upgrade/rollback testing.
-Strata full-context proof
-remains `INCONCLUSIVE` until a real approved serving run; the installed build
-lacks calibration commands. The desktop dependency graph is outside the pnpm
+Phase 8's live acceptance gate remains unmet: no systemd unit, `.deb` or
+production database was installed/restored, no target-host acceptance run
+exists and no L40S hardware is available. Strata full-context proof remains
+`INCONCLUSIVE` until a real approved serving run; the installed build lacks
+calibration commands. The desktop dependency graph is outside the pnpm
 workspace and has no committed lockfile yet; do not claim a clean reproducible
 desktop install until that is fixed.
 
@@ -98,6 +106,12 @@ desktop install until that is fixed.
     evidence or missing context never becomes a pass.
 13. **`attic/` is archival.** Do not import, format, modify or activate anything
     under `attic/`. It records an abandoned parallel draft only.
+14. **Backup and restore are offline and non-destructive by default.** The
+    backup CLI uses SQLite's online backup API, verifies sizes/SHA-256/integrity
+    and never opens a network connection. Restore requires services stopped,
+    refuses active WAL/shm sidecars, refuses an existing target unless replace is
+    explicit and snapshots the previous target first. Never delete the only
+    database copy or a model/engine root during recovery.
 
 ## Required commands
 
@@ -119,6 +133,9 @@ uv run ruff check
 uv run ruff format --check
 uv run mypy python
 uv run pytest -q
+
+# offline backup CLI (temporary paths shown; never a production database)
+uv run python scripts/backup_databases.py --help
 
 # contracts and TypeScript
 uv run python scripts/check_contracts.py
@@ -147,12 +164,16 @@ work offline and must not start an HTTP listener. CI must fail on drift.
 - `python/lab_adapters` — pure engine adapters and conformance fixtures.
 - `python/lab_updates` — pure release metadata, deterministic impact
   classification and paired A/B evaluation; no network or process I/O.
-- `python/lab_api` — FastAPI app, auth, persistence, queues, SSE, Alembic.
+- `python/lab_api` — FastAPI app, auth, persistence, queues, SSE, Alembic and
+  offline backup/restore helpers.
 - `python/lab_optimizer` — supervised Optuna process and internal client.
 - `python/lab_worker` — real worker discovery/execution plus explicit simulation.
 - `apps/desktop` — Electron/React/Vite operator UI, secure IPC bridge and local
   Debian package builder. It is outside the pnpm workspace.
 - `packaging/systemd` — unit definitions and deployment notes (not installed).
+- `scripts/backup_databases.py` — operator backup/verify/restore CLI.
+- `docs/RUNBOOK.md` — install/upgrade/restore/uninstall and live acceptance.
+- `docs/ACCEPTANCE_MATRIX.md` — AC-01…AC-44 evidence and blocked gates.
 - `contracts/` — committed generated OpenAPI/JSON Schema/manifest.
 - `packages/client-contracts` — generated TypeScript declarations.
 - `tests/` — offline Python unit/integration/resilience/contract tests.
@@ -193,5 +214,6 @@ work offline and must not start an HTTP listener. CI must fail on drift.
   release, download an engine/model artifact, execute a candidate binary or
   overwrite an installed build. Comparison evidence is supplied explicitly and
   retained immutably.
-- Do not install or enable the systemd units, install the `.deb`, or sign and
-  publish release artifacts without explicit operator approval.
+- Do not install or enable the systemd units, install the `.deb`, restore a
+  production database, or sign and publish release artifacts without explicit
+  operator approval.

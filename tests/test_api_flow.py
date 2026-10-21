@@ -198,25 +198,38 @@ def test_qualified_measured_evidence_builds_a_validated_recipe(
         candidates = {row.candidate_id: CandidateRole(row.payload_json["role"]) for row in candidate_rows}
         observation_rows = session.query(ObservationRow).filter_by(experiment_id=experiment_id).all()
         assert len(observation_rows) == len(candidate_rows)
-        for row in observation_rows:
-            observation = BenchmarkObservation.model_validate(row.payload_json)
+        observations = [BenchmarkObservation.model_validate(row.payload_json) for row in observation_rows]
+        baseline = next(
+            observation
+            for observation in observations
+            if candidates[observation.candidate_id] is CandidateRole.BASELINE
+        )
+        assert baseline.metrics.prefill_tokens_per_sec is not None
+        assert baseline.metrics.decode_tokens_per_sec is not None
+        baseline_prefill = baseline.metrics.prefill_tokens_per_sec
+        baseline_decode = baseline.metrics.decode_tokens_per_sec
+        for row, observation in zip(observation_rows, observations, strict=True):
             role = candidates[observation.candidate_id]
-            scale = 1.5 if role is CandidateRole.CANDIDATE else 1.0
-            metrics = observation.metrics.model_copy(
-                update={
-                    "prefill_tokens_per_sec": observation.metrics.prefill_tokens_per_sec * scale,
-                    "decode_tokens_per_sec": observation.metrics.decode_tokens_per_sec * scale,
-                }
-            )
-            samples = tuple(
-                sample.model_copy(
+            if role is CandidateRole.CANDIDATE:
+                assert len(observation.samples) == len(baseline.samples)
+                metrics = observation.metrics.model_copy(
                     update={
-                        "prefill_tokens_per_sec": sample.prefill_tokens_per_sec * scale,
-                        "decode_tokens_per_sec": sample.decode_tokens_per_sec * scale,
+                        "prefill_tokens_per_sec": baseline_prefill * 1.5,
+                        "decode_tokens_per_sec": baseline_decode * 1.5,
                     }
                 )
-                for sample in observation.samples
-            )
+                samples = tuple(
+                    sample.model_copy(
+                        update={
+                            "prefill_tokens_per_sec": baseline_sample.prefill_tokens_per_sec * 1.5,
+                            "decode_tokens_per_sec": baseline_sample.decode_tokens_per_sec * 1.5,
+                        }
+                    )
+                    for sample, baseline_sample in zip(observation.samples, baseline.samples, strict=True)
+                )
+            else:
+                metrics = observation.metrics
+                samples = observation.samples
             retained_gates = tuple(
                 gate
                 for gate in observation.quality_gates
