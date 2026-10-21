@@ -1,14 +1,16 @@
 # AI Inference Optimization Lab
 
-Phase 3 foundation for a local-first inference optimization controller,
-supervised Optuna process, durable Linux worker protocol and conformance-tested
-llama.cpp/Strata adapters.
+Phase 4 foundation for a local-first inference optimization controller,
+supervised Optuna process, durable Linux worker protocol, conformance-tested
+llama.cpp/Strata adapters and tokenizer-backed benchmark workloads.
 
 > **The execution lanes are separate.** `lab-worker-sim` produces deterministic
 > simulated observations marked `simulated=true`; those can never qualify a
 > recipe. `lab-worker` is the real Linux lane: it probes configured installed
 > engines and models, launches argv-only subprocesses, leases GPU UUIDs and
-> records measured evidence. Missing evidence stays missing.
+> records measured evidence. Missing evidence stays missing. Prompts are fitted
+> with the target engine tokenizer when available; a character-estimated prompt
+> is labelled `screening_only`.
 
 The authoritative specification is [`docs/prd.md`](docs/prd.md). Architecture
 and decisions are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and

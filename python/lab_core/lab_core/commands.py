@@ -20,7 +20,7 @@ from .base import (
 )
 from .engine import EngineIdentity
 from .enums import AckDisposition, CommandStatus, CommandType, ContextLength, FailureKind
-from .experiment import ContextFeasibility
+from .experiment import ContextFeasibility, WorkloadSuite
 from .model import ModelArtifact
 from .observation import BenchmarkObservation
 from .version import SCHEMA_VERSION, WORKER_PROTOCOL_VERSION
@@ -60,6 +60,7 @@ class ClaimTrialPayload(FrozenModel):
     parameters: Parameters
     parameter_digest: Sha256
     workload_digest: Sha256
+    workload: WorkloadSuite | None = None
     engine: EngineIdentity
     model: ModelArtifact
     gpu_uuids: tuple[str, ...] = ()
@@ -67,6 +68,12 @@ class ClaimTrialPayload(FrozenModel):
     lease_generation: PositiveInt
     expected_snapshot_revision: NonNegativeInt
     simulation_only: bool = False
+
+    @model_validator(mode="after")
+    def _workload_matches_digest(self) -> ClaimTrialPayload:
+        if self.workload is not None and self.workload.digest() != self.workload_digest:
+            raise ValueError("workload does not match workload_digest")
+        return self
 
 
 class PausePayload(FrozenModel):

@@ -54,9 +54,18 @@ from lab_core import (
     VerifyRecipePayload,
     VerifyRecipeResult,
     WorkerCommandLease,
+    WorkloadSuite,
 )
 
-from .bench import derive_serving_metrics, effective_context, run_serving_workload
+from .bench import (
+    CHARACTER_FALLBACK,
+    ServingSuite,
+    derive_suite_metrics,
+    effective_context,
+    run_serving_suite,
+    token_load_mismatch,
+    validate_context_measurement,
+)
 from .config import WorkerSettings
 from .discovery import DiscoveryResult, discover_snapshot
 from .engines import EngineBundle, discover_engines, sha256_file
@@ -647,7 +656,7 @@ class RealExecutor:
         native_run: RunResult | None = None
         native_text = ""
         server_run: RunResult | None = None
-        serving = None
+        serving: ServingSuite | None = None
         server: ServerProcess | None = None
         server_port = allocate_loopback_port()
         try:
@@ -693,12 +702,17 @@ class RealExecutor:
                     on_tick=on_tick,
                 )
                 if server is not None:
-                    serving = run_serving_workload(
+                    workload = payload.workload or WorkloadSuite()
+                    serving = run_serving_suite(
                         self.settings,
                         port=server_port,
                         model_name=str(model.metadata.get("model_name") or model.model_id),
+                        engine_id=bundle.engine_id.value,
                         context_tokens=int(candidate.context),
-                        output_tokens=128,
+                        workload=workload,
+                        tokenizer_id=str(
+                            model.metadata.get("tokenizer_path") or model.tokenizer_id or model.model_id
+                        ),
                         gpu_uuid=gpu_lease.uuid_list[0] if gpu_lease and gpu_lease.uuid_list else None,
                         pid=server._process.pid,
                         timeout_seconds=max(120.0, int(candidate.context) / 32.0),
@@ -735,7 +749,7 @@ class RealExecutor:
         native_run: RunResult | None,
         native_text: str,
         server_run: RunResult | None,
-        serving: Any | None,
+        serving: ServingSuite | None,
         cancel_event: Event,
         model: ModelArtifact,
     ) -> BenchmarkObservation:
@@ -809,11 +823,16 @@ class RealExecutor:
             raw.extend(server_run.artifacts)
             telemetry_summary.samples.extend(server_run.telemetry.samples)
             telemetry_summary.errors.extend(server_run.telemetry.errors)
+        context_mismatch: str | None = None
         if serving is not None:
-            raw.extend(server_run.artifacts if server_run else ())
-            telemetry_summary.samples.extend(serving.telemetry.samples)
-            telemetry_summary.errors.extend(serving.telemetry.errors)
-            if serving.status_document:
+            for run in serving.runs:
+                telemetry_summary.samples.extend(run.telemetry.samples)
+                telemetry_summary.errors.extend(run.telemetry.errors)
+            status_document = next(
+                (run.status_document for run in serving.runs if run.status_document),
+                None,
+            )
+            if status_document:
                 # The adapter owns engine-specific interpretation of /props or
                 # /v1/status. It may fill context identity, never client-observed
                 # throughput or a peak VRAM value.
@@ -825,7 +844,7 @@ class RealExecutor:
                             evidence_id=f"{payload.candidate_id}-status",
                             path=f"server-status:{payload.candidate_id}",
                             content_type="application/json",
-                            text=json.dumps(serving.status_document, sort_keys=True),
+                            text=json.dumps(status_document, sort_keys=True),
                         ),
                         None,
                         candidate,
@@ -838,29 +857,30 @@ class RealExecutor:
                     )
                 except Exception as exc:
                     notes.append(f"server status parser refused the document: {type(exc).__name__}: {exc}")
+            primary_runs = serving.primary_runs()
+            near_run = serving.near_run()
             if serving.completed:
-                derived = derive_serving_metrics(serving)
+                derived = derive_suite_metrics(serving)
                 metrics = metrics.model_copy(
                     update={
                         "time_to_first_token_ms": derived["time_to_first_token_ms"],
                         "total_latency_ms": derived["total_latency_ms"],
-                        "prefill_tokens_per_sec": derived["prefill_tokens_per_sec"]
-                        if metrics.prefill_tokens_per_sec is None
-                        else metrics.prefill_tokens_per_sec,
-                        "decode_tokens_per_sec": derived["decode_tokens_per_sec"]
-                        if metrics.decode_tokens_per_sec is None
-                        else metrics.decode_tokens_per_sec,
+                        "prefill_tokens_per_sec": derived["prefill_tokens_per_sec"],
+                        "decode_tokens_per_sec": derived["decode_tokens_per_sec"],
                     }
                 )
-                effective = serving.effective_context
-                input_tokens = serving.prompt_tokens
-                output_tokens = serving.output_tokens
-                if serving.text_preview:
+                primary = primary_runs[0]
+                effective = primary.effective_context or effective
+                input_tokens = derived["prompt_tokens"]
+                output_tokens = derived["output_tokens"]
+                if all(run.text_preview for run in primary_runs):
                     quality.append(
                         QualityGate(
                             name="non_empty_output",
                             status=QualityGateStatus.PASSED,
-                            details="one deterministic streaming completion returned text",
+                            details=(
+                                "deterministic streaming completions returned text at every completed level"
+                            ),
                         )
                     )
                 else:
@@ -883,15 +903,113 @@ class RealExecutor:
                             details="server-reported effective context",
                         )
                     )
-                if metrics.time_to_first_token_ms is not None and metrics.total_latency_ms is not None:
-                    measurement = MeasurementStatus.MEASURED
+                if any(run.token_count_method == CHARACTER_FALLBACK for run in serving.runs):
+                    quality.append(
+                        QualityGate(
+                            name="tokenizer_backed_prompt",
+                            status=QualityGateStatus.NOT_RUN,
+                            details=(
+                                "the installed server exposed no usable tokenizer endpoint; "
+                                "prompt sizes are character estimates"
+                            ),
+                        )
+                    )
+                    measurement = MeasurementStatus.SCREENING_ONLY
+                    notes.append("tokenizer endpoint was unavailable; serving metrics are screening-only")
+                elif all(run.measured_prompt_tokens is not None for run in serving.runs if run.completed):
+                    quality.append(
+                        QualityGate(
+                            name="tokenizer_backed_prompt",
+                            status=QualityGateStatus.PASSED,
+                            details="prompt loads were fitted and verified with the target engine tokenizer",
+                        )
+                    )
                 else:
+                    quality.append(
+                        QualityGate(
+                            name="tokenizer_backed_prompt",
+                            status=QualityGateStatus.INCONCLUSIVE,
+                            details="one or more completed requests lacked a tokenizer measurement",
+                        )
+                    )
+                    measurement = MeasurementStatus.SCREENING_ONLY
+                try:
+                    context_measurement = validate_context_measurement(
+                        serving, context_tokens=int(payload.context)
+                    )
+                    if context_measurement is not None:
+                        context_measurement.validate_measurement()
+                except Exception as exc:
+                    context_mismatch = f"context measurement failed: {exc}"
+                    quality.append(
+                        QualityGate(
+                            name="context_truncation",
+                            status=QualityGateStatus.FAILED,
+                            details=context_mismatch,
+                        )
+                    )
+                else:
+                    quality.append(
+                        QualityGate(
+                            name="context_truncation",
+                            status=QualityGateStatus.PASSED
+                            if context_measurement is not None
+                            else QualityGateStatus.INCONCLUSIVE,
+                            details="planned near-capacity load fit inside the measured effective context",
+                        )
+                    )
+                mismatch = token_load_mismatch(near_run)
+                if mismatch is not None:
+                    context_mismatch = context_mismatch or mismatch
+                    quality.append(
+                        QualityGate(
+                            name="planned_prompt_tokens",
+                            status=QualityGateStatus.FAILED,
+                            details=mismatch,
+                        )
+                    )
+                else:
+                    quality.append(
+                        QualityGate(
+                            name="planned_prompt_tokens",
+                            status=QualityGateStatus.PASSED,
+                            details="measured prompt tokens were within tolerance of the plan",
+                        )
+                    )
+                if context_mismatch is not None:
+                    measurement = MeasurementStatus.INVALID
+                elif measurement is MeasurementStatus.UNAVAILABLE and not metrics.missing(
+                    (
+                        "prefill_tokens_per_sec",
+                        "decode_tokens_per_sec",
+                        "time_to_first_token_ms",
+                        "total_latency_ms",
+                    )
+                ):
+                    measurement = MeasurementStatus.MEASURED
+                elif metrics.missing(
+                    (
+                        "prefill_tokens_per_sec",
+                        "decode_tokens_per_sec",
+                        "time_to_first_token_ms",
+                        "total_latency_ms",
+                    )
+                ):
                     measurement = MeasurementStatus.UNAVAILABLE
                     notes.append(
                         "server usage did not expose both client-side metrics; values were not invented"
                     )
             else:
+                quality.append(
+                    QualityGate(
+                        name="serving_lane",
+                        status=QualityGateStatus.FAILED,
+                        details=(serving.error or "serving workload failed")[:2000],
+                    )
+                )
                 notes.append(serving.error or "serving workload failed")
+                if near_run is not None and near_run.error:
+                    notes.append("near-capacity case did not complete; no full-context claim is possible")
         else:
             quality.append(
                 QualityGate(
@@ -907,7 +1025,9 @@ class RealExecutor:
         native_ok = native_run is not None and native_run.succeeded
         server_ok = serving is not None and serving.completed
         native_failed = native_run is not None and not native_run.succeeded
-        server_failed = server_run is not None and not server_run.succeeded and not server_ok
+        server_failed = (serving is not None and not serving.completed) or (
+            server_run is not None and not server_run.succeeded and not server_ok
+        )
         if cancel_event.is_set():
             status = ObservationStatus.CANCELLED
             measurement = MeasurementStatus.INVALID
@@ -955,6 +1075,15 @@ class RealExecutor:
             )
         elif server_failed:
             notes.append("serving lane failed but native microbench completed; this trial is screening-only")
+
+        if context_mismatch is not None and status is ObservationStatus.COMPLETED:
+            status = ObservationStatus.FAILED
+            measurement = MeasurementStatus.INVALID
+            failure = FailureInfo(
+                kind=FailureKind.CONTEXT_MISMATCH,
+                message=context_mismatch[:2000],
+            )
+            notes.append("serving evidence was rejected because the planned context was not proven")
 
         if telemetry_summary.samples:
             telemetry = TelemetryCoverage(

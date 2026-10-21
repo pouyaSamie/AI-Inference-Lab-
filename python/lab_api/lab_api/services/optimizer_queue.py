@@ -520,6 +520,7 @@ def _enqueue_claim(
         parameters=candidate.parameters,
         parameter_digest=candidate.parameter_digest or "",
         workload_digest=candidate.workload_digest,
+        workload=spec.workload,
         engine=spec.engine,
         model=spec.model,
         gpu_uuids=spec.gpu_uuids,

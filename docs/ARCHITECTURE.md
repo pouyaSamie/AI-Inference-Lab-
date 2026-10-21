@@ -1,4 +1,4 @@
-# Architecture — Phase 0/1 foundation, Phase 2 worker, Phase 3 adapters
+# Architecture — Phase 0/1 foundation, Phase 2 worker, Phase 3 adapters, Phase 4 workloads
 
 Status: Phase 1 is complete and verified. Phase 2 adds a production Linux worker
 with observed engine/model discovery, native process execution, GPU UUID leases,
@@ -254,13 +254,14 @@ Recovery rules:
 - **Preflight** for llama.cpp starts a CPU-offload (`--n-gpu-layers 0`) server at
   the maximum requested context and reads the effective context. It proves
   allocation at that context, not GPU residency. Strata full-context proof is
-  deferred until the Phase 4 serving harness; the installed build lacks
-  calibration commands, so the result is explicitly `inconclusive`, never
-  fabricated.
+  produced by the Phase 4 serving harness; it remains `INCONCLUSIVE` until a
+  real approved run because the installed build lacks calibration commands.
 - **Trials** collect native `llama-bench` evidence where available and a
-  streaming OpenAI-compatible serving measurement. Missing metrics remain
-  missing; a native-only run is `screening_only`. Observations always carry
-  `simulated=false` on the real lane.
+  streaming OpenAI-compatible serving measurement. The serving harness runs a
+  tokenizer-fitted prompt ladder, repeats the primary load and checks the
+  near-capacity load against actual usage and effective context. Missing metrics
+  remain missing; a native-only run is `screening_only`. Observations always
+  carry `simulated=false` on the real lane.
 - **Adapter evidence parsing** interprets `/props` or `/v1/status` for context
   identity and engine-specific fields. Client-observed TTFT, latency and usage
   keep precedence; a status document is never used to invent a peak VRAM or
@@ -292,15 +293,41 @@ Recovery rules:
   `native_shard` produces `--native SHARD1`. The unobserved `--mtp` form is not
   emitted.
 - **Full-context honesty.** Strata full-context proof remains `INCONCLUSIVE`
-  until the Phase 4 serving harness. The installed build's missing calibration
-  commands are recorded as a boundary, not replaced with a guessed command.
+  until a real approved Phase 4 harness run. The installed build's missing
+  calibration commands are recorded as a boundary, not replaced with a guessed
+  command.
 
-## 13. Phase boundary
+## 13. Tokenizer-backed workloads (Phase 4)
+
+- **Frozen corpus.** `lab_bench.corpus` owns the non-secret
+  `lab-synthetic-v1` unit and its SHA-256. Fitting iterates against a supplied
+  token counter; a character estimate is never called a token count.
+- **Controller-owned suite.** `WorkloadSuite` travels in the durable
+  `ClaimTrialPayload` and must match `workload_digest`. Fractions, output cap,
+  seed and sampling are not invented by the worker.
+- **Target-engine tokenization.** llama.cpp uses `/apply-template` +
+  `/tokenize`; Strata uses `/v1/messages/count_tokens`. If no endpoint is
+  usable, the prompt is labelled `character-fallback` and the observation is
+  `screening_only`.
+- **Ladder, not an average.** Every level runs once; the primary comparable
+  level is repeated and medianed; the near-capacity level is a separate stress
+  probe. Different prompt loads are never merged.
+- **Context proof.** Actual prompt/output usage and effective context are
+  checked. Truncation, overflow or a prompt-load miss invalidates the serving
+  measurement with `CONTEXT_MISMATCH`.
+- **Strata source identity.** Read-only discovery resolves every
+  `conversions.json` source shard by exact basename and byte size. All resolved
+  shards enter model files and are hashed when enabled. Missing, ambiguous or
+  changed shards produce a warning and no `--native` argument. Only the first
+  resolved shard becomes `--native SHARD1`; `native: true` is never a path.
+
+## 14. Phase boundary
 
 Phases 0/1 prove protocol, persistence, planning, lifecycle, recovery and
 pure-adapter behavior. Phase 2 proves the worker-owned process, discovery, GPU
 lease and command execution machinery. Phase 3 proves adapter conformance
 against the installed help/version/evidence fixtures and the observed live
-surface; it still does **not** prove real llama.cpp/Strata performance, quality,
-statistical finalization or validated recipes. Phase 4 adds benchmark lanes and
-real evidence; Phase 5 adds search/finalization; Phase 6 adds the UI.
+surface. Phase 4 adds tokenizer-backed workload lanes and read-only Strata
+source-shard identity; it does **not** prove real llama.cpp/Strata performance,
+quality, statistical finalization or validated recipes until an approved run
+produces evidence. Phase 5 adds search/finalization; Phase 6 adds the UI.

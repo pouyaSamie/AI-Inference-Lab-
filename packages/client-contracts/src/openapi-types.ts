@@ -149,6 +149,7 @@ export interface components {
       "study_id": components["schemas"]["Identifier"];
       "timeout_seconds"?: components["schemas"]["PositiveInt"];
       "trial_number": components["schemas"]["PositiveInt"];
+      "workload"?: components["schemas"]["WorkloadSuite"] | null;
       "workload_digest": components["schemas"]["Sha256"];
     };
     "CommandAck": {

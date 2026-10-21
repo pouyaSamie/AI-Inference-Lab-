@@ -7,6 +7,7 @@ exercise the same process, lease and journal paths the real worker uses.
 
 from __future__ import annotations
 
+import json
 import struct
 import subprocess
 import sys
@@ -102,6 +103,69 @@ def test_gguf_metadata_and_shard_grouping(tmp_path: Path) -> None:
     assert model.verified is True
     assert all(item.sha256 for item in model.files)
     assert warnings == []
+
+
+def test_strata_pack_resolves_read_only_native_shards(tmp_path: Path) -> None:
+    model_root = tmp_path / "models"
+    source = model_root / "Strata-Tiny" / "models" / "Q2_0" / "Tiny-00001-of-00002.gguf"
+    source_second = model_root / "Strata-Tiny" / "models" / "Q2_0" / "Tiny-00002-of-00002.gguf"
+    write_gguf(
+        source,
+        {
+            "general.architecture": "qwen2",
+            "general.name": "Strata Tiny",
+            "qwen2.context_length": 4096,
+        },
+    )
+    write_gguf(
+        source_second,
+        {"general.architecture": "qwen2", "general.name": "Strata Tiny"},
+    )
+    pack = model_root / "Strata-Tiny" / "packs" / "q2_0"
+    pack.mkdir(parents=True)
+    (pack / "index.txt").write_text("# synthetic pack\n", encoding="utf-8")
+    (pack / "native_experts.txt").write_text("# synthetic native experts\n", encoding="utf-8")
+    (pack / "dense.bin").write_bytes(b"dense")
+    (pack / "experts.bin").write_bytes(b"experts")
+    (pack / "conversions.json").write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "source_shards": [
+                    {"name": source.name, "size": source.stat().st_size},
+                    {"name": source_second.name, "size": source_second.stat().st_size},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    settings = _settings(tmp_path)
+    warnings: list[str] = []
+    models = discover_models(settings, roots=(model_root,), warnings=warnings, hash_models=True)
+    strata = [model for model in models if model.model_family == "strata"]
+    assert len(strata) == 1
+    model = strata[0]
+    assert model.metadata["native_shard"] == str(source)
+    assert model.metadata["native_shard_size_bytes"] == source.stat().st_size
+    first_shard = next(item for item in model.files if item.shard_index == 1)
+    assert model.metadata["native_shard_sha256"] == first_shard.sha256
+    assert model.metadata["source_shards"] == [
+        {"name": source.name, "size": source.stat().st_size},
+        {"name": source_second.name, "size": source_second.stat().st_size},
+    ]
+    source_files = [item for item in model.files if item.shard_index is not None]
+    assert [item.path for item in source_files] == [str(source), str(source_second)]
+    assert all(item.shard_count == 2 and item.verified for item in source_files)
+    assert model.verified is True
+    assert warnings == []
+
+    (pack / "conversions.json").write_text("not json", encoding="utf-8")
+    warnings.clear()
+    models = discover_models(settings, roots=(model_root,), warnings=warnings, hash_models=False)
+    strata = [model for model in models if model.model_family == "strata"]
+    assert strata and strata[0].metadata["native_shard"] is None
+    assert any(item.startswith("STRATA_SOURCE_SHARDS_MISSING") for item in warnings)
 
 
 def test_hash_cache_reuses_stat_identity(tmp_path: Path) -> None:

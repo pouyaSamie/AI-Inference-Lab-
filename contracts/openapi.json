@@ -857,6 +857,16 @@
           "trial_number": {
             "$ref": "#/components/schemas/PositiveInt"
           },
+          "workload": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkloadSuite"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "workload_digest": {
             "$ref": "#/components/schemas/Sha256"
           }

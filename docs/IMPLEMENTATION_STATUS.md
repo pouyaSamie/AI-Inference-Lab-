@@ -21,13 +21,14 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 | Real Linux worker | Implemented | Observed engine/model discovery, hardware/GPU telemetry, SHA-256 cache, sandboxes, journal, GPU UUID `flock` leases, argv-only runner, crash recovery, cancellation. |
 | Real command handlers | Implemented | `SCAN`, `PREFLIGHT`, `CLAIM_TRIAL`, `PAUSE`, `CANCEL`, `VERIFY_RECIPE`; `PROMOTE` is dry-run/idempotent only. |
 | Phase 1 execution lane | Explicitly simulated | `lab-worker-sim` emits `simulated=true` and `measurement_status=simulated` only. |
-| Real execution lane | Implemented, not fully exercised | `lab-worker` emits only `simulated=false`. Live inventory/scan smoke passed; no real preflight or trial was run yet. |
+| Real execution lane | Implemented, not fully exercised | `lab-worker` emits only `simulated=false`. Live inventory/scan smoke passed; no real preflight or trial was run yet. Trials now run a tokenizer-backed workload ladder and near-capacity context check when a server is available. |
 | Recipe validation | Implemented, rejects simulation | Simulated evidence returns `409`; incomplete/screening-only real evidence cannot qualify. |
 | SSE | Implemented | Initial `snapshot`, sequenced events, `event.gap` for stale `Last-Event-ID`, bounded page endpoint. |
 | Generated contracts | Implemented, checked in | OpenAPI, JSON Schema/manifest and strict TypeScript declarations; offline generation and drift gate. |
 | systemd packaging | Authored, not installed | Three service units plus an environment template and security notes under `packaging/systemd/`. |
 | Electron/React UI | Not implemented | Phase 6. |
-| Benchmark corpus / statistical finalization | Not implemented | Phase 4/5. No validated real recipe exists. |
+| Tokenizer-backed workloads | Implemented, offline | Frozen `lab-synthetic-v1` corpus, engine tokenizer fitting, prompt-level ladder, repeated-primary medians and near-capacity truncation checks. No live serving run yet. |
+| Statistical finalization / validated recipes | Not implemented | Phase 5. No validated real recipe exists. |
 | Update intelligence / release qualification | Not implemented | Phase 7/8. |
 
 ## 2. Runtime components
@@ -54,6 +55,10 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
   operator-approved roots. Discovery never writes to a model root.
 - Hashes files into a persistent `(size, mtime_ns)` cache. The first full scan
   of the ~270 GiB model root is expensive; later scans reuse cached digests.
+- Resolves Strata `conversions.json` source shards read-only. Every shard must
+  match an exact basename and byte size; all resolved shards enter the model
+  files and are hashed when enabled. Missing, ambiguous or changed shards
+  produce no `--native` argument.
 - A snapshot with missing hashes is still plannable but carries warnings. The
   real executor rejects preflight/trials until all model hashes are complete.
 
@@ -78,6 +83,13 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 - llama.cpp trials collect native `llama-bench` metrics where present and a
   streaming `/v1/chat/completions` serving lane. Missing metrics stay missing;
   native-only evidence is `screening_only`.
+- The serving lane fits the frozen corpus with the target engine tokenizer:
+  llama.cpp uses `/apply-template` + `/tokenize`; Strata uses
+  `/v1/messages/count_tokens`. Every prompt level runs once, the primary level
+  is repeated and medianed, and the near-capacity level is a separate probe.
+- Character-estimated prompts are labelled `character-fallback` and cannot
+  produce measured evidence. Silent truncation, context overflow or a measured
+  prompt load outside tolerance produces `CONTEXT_MISMATCH`.
 - The engine adapter parses server `/props` or `/v1/status` for context identity
   and engine fields. Client-observed TTFT/usage keep precedence; a status
   document is not treated as measured peak VRAM or throughput.
@@ -85,9 +97,11 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
   supported requested context and records the effective context. This proves
   allocation at that context, **not** GPU residency. Lower requested contexts
   inherit that proof explicitly; GPU fit is measured by trials.
-- Strata full-context proof is deferred to the Phase 4 serving harness because
-  the installed build lacks calibration commands. The result is
-  `inconclusive`, never fabricated.
+- The Phase 4 serving harness performs the near-capacity context check with
+  tokenizer-fitted prompts and actual usage. Strata full-context proof remains
+  `INCONCLUSIVE` until that harness runs against a real approved process; the
+  installed build's missing calibration commands are not replaced with a
+  guessed command.
 - Real observations always have `simulated=false`; simulation can never produce
   a validated recipe.
 
@@ -101,13 +115,13 @@ uv run ruff check
 # All checks passed!
 
 uv run ruff format --check
-# 106 files already formatted
+# 108 files already formatted
 
 uv run mypy python
-# Success: no issues found in 90 source files
+# Success: no issues found in 91 source files
 
 uv run pytest -q
-# 33 passed in 7.59s
+# 42 passed in 8.10s
 
 uv run python scripts/check_contracts.py
 # contracts are current
@@ -145,6 +159,18 @@ Qwen3.6-35B-A3B-UD-Q4_K_M, Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M
 and 2 Strata packs. All were correctly reported `verified=false` because
 hashing was disabled for the probe. No weights were modified.
 
+A Phase 4 read-only discovery pass resolved both Strata packs with no warnings:
+
+```text
+Strata-Qwen3.8-Flash-Next-Q2_0-coder-iq1_m
+  native_shard .../IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf
+Strata-Qwen3.8-Flash-Next-Q2_0-q2_0
+  native_shard .../models/Q2_0/Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.gguf
+```
+
+A read-only Strata profile check emitted `--native <resolved shard>` and no
+duplicate managed arguments. The source shards were not opened for writing.
+
 ### Live controller/worker smoke
 
 A temporary controller (loopback port 8790, temporary SQLite stores under
@@ -171,25 +197,27 @@ unit coverage uses a synthetic GGUF file, the trusted Python interpreter, fake
 probe scripts, GPU lease exclusivity, runner success/timeout/cancel and journal
 crash recovery. Phase 3 adds offline golden conformance tests for installed
 llama.cpp server/bench output, Strata stderr help/status output, typed candidate
-rejection, profile de-duplication and generated-file digest checks. No test
-requires a GPU, downloaded weights or a live engine.
+rejection, profile de-duplication and generated-file digest checks. Phase 4
+adds offline corpus/tokenizer tests, workload-suite median and context-rejection
+coverage, and two-shard Strata source resolution tests. No test requires a GPU,
+downloaded weights, a live engine or external network access.
 
 ## 5. What is not proven
 
 These are intentional boundaries, not hidden gaps:
 
 - No real `PREFLIGHT` or `CLAIM_TRIAL` has been executed end-to-end. The model
-  root has not been fully hashed (about 270 GiB).
+  root, including all Strata source shards, has not been fully hashed (about
+  270 GiB).
+- The tokenizer-backed serving harness has not run against a live server. The
+  llama.cpp tokenizer routes and Strata `count_tokens` endpoint are covered
+  offline, not by a real request.
 - No real 4K/32K/128K latency, VRAM, quality or thermal measurement exists.
 - No second GPU (for example L40S) comparison exists; only the RTX 3060 is
   installed.
-- Strata full-context proof is `INCONCLUSIVE` pending the Phase 4 serving
-  harness. Its native benchmark command is not exposed by the installed build.
-- Model discovery records the Strata pack and a `native: true` marker but does
-  not yet resolve the source GGUF shard path. The adapter therefore refuses to
-  stringify that marker into `--native True`; it emits `--native SHARD1` only
-  when an explicit `native_shard` is present. The unobserved `--mtp` form is not
-  emitted.
+- Strata full-context proof is `INCONCLUSIVE` until a real approved serving run.
+  Its native benchmark command is not exposed by the installed build; the
+  `--mtp` form is not emitted.
 - `PAUSE` currently stops the active trial at the process-group boundary; it is
   not a resumable checkpoint. Safe-boundary pause is a Phase 5/lifecycle item.
 - Simulated throughput, VRAM/telemetry and OOM values are deterministic test
@@ -241,9 +269,10 @@ engines/models and GPU access; the simulated lane needs neither.
 
 ## 8. Next gate
 
-Phase 3 is complete at the adapter/contract boundary and committed locally.
-Phase 4 adds the benchmark corpora, real serving/full-context work and evidence
-collection. The open Phase 2/3 evidence items (full model hashing, a real
-preflight, one real low-impact trial and Strata native-shard resolution) must be
-executed before any Phase 5 recipe can be considered. See `docs/NEXT_STEPS.md`,
-`docs/progress/PHASE_2_REPORT.md` and `docs/progress/PHASE_3_REPORT.md`.
+Phase 4 is complete at the tokenizer/workload boundary and committed locally.
+Strata source-shard resolution is implemented read-only. The open evidence items
+(full model/source-shard hashing, a real preflight, one real low-impact
+tokenized trial and a real near-capacity context check) must be executed before
+any Phase 5 recipe can be considered. See `docs/NEXT_STEPS.md`,
+`docs/progress/PHASE_2_REPORT.md`, `docs/progress/PHASE_3_REPORT.md` and
+`docs/progress/PHASE_4_REPORT.md`.

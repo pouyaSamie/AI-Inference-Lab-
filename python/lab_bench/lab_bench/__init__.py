@@ -1,5 +1,18 @@
 """lab_bench public surface."""
 
+from .corpus import (
+    CORPUS_ID,
+    CORPUS_SHA256,
+    CORPUS_VERSION,
+    CorpusMismatch,
+    PromptFit,
+    TokenCounter,
+    corpus_sha256,
+    corpus_unit,
+    fit_prompt_to_tokens,
+    render_corpus,
+    verify_corpus,
+)
 from .normalize import native_metrics, normalize_samples_ts, tokens_per_second
 from .protocol import (
     CONTEXT_LABELS,
@@ -10,22 +23,39 @@ from .protocol import (
     ProtocolConfig,
     ProtocolViolation,
     WorkloadCase,
+    near_capacity_case,
+    plan_workload_suite,
     plan_workloads,
+    primary_case,
     workload_digest,
 )
 
 __all__ = [
     "CONTEXT_LABELS",
     "CONTEXT_MATRIX",
+    "CORPUS_ID",
+    "CORPUS_SHA256",
+    "CORPUS_VERSION",
     "DEFAULT_PROTOCOL",
     "ContextMeasurement",
+    "CorpusMismatch",
+    "PromptFit",
     "PromptLoad",
     "ProtocolConfig",
     "ProtocolViolation",
+    "TokenCounter",
     "WorkloadCase",
+    "corpus_sha256",
+    "corpus_unit",
+    "fit_prompt_to_tokens",
     "native_metrics",
+    "near_capacity_case",
     "normalize_samples_ts",
+    "plan_workload_suite",
     "plan_workloads",
+    "primary_case",
+    "render_corpus",
     "tokens_per_second",
+    "verify_corpus",
     "workload_digest",
 ]

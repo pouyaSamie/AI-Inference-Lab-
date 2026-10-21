@@ -7518,6 +7518,17 @@
             "trial_number": {
               "$ref": "#/$defs/PositiveInt"
             },
+            "workload": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WorkloadSuite"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
             "workload_digest": {
               "$ref": "#/$defs/Sha256"
             }
@@ -8067,6 +8078,11 @@
           "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
+        "UnitFraction": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "type": "number"
+        },
         "VerifyRecipePayload": {
           "additionalProperties": false,
           "properties": {
@@ -8096,6 +8112,77 @@
             "expected_model_digest"
           ],
           "title": "VerifyRecipePayload",
+          "type": "object"
+        },
+        "WorkloadSuite": {
+          "additionalProperties": false,
+          "properties": {
+            "dataset_id": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "lab-synthetic-v1"
+            },
+            "dataset_sha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "deterministic_sampling": {
+              "default": true,
+              "title": "Deterministic Sampling",
+              "type": "boolean"
+            },
+            "extended_output_tokens": {
+              "$ref": "#/$defs/PositiveInt",
+              "default": 1024
+            },
+            "output_tokens": {
+              "$ref": "#/$defs/PositiveInt",
+              "default": 256
+            },
+            "prompt_levels": {
+              "default": [
+                0.25,
+                0.6,
+                0.85,
+                0.98
+              ],
+              "items": {
+                "$ref": "#/$defs/UnitFraction"
+              },
+              "title": "Prompt Levels",
+              "type": "array"
+            },
+            "protocol": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "LAB-BENCH-v1"
+            },
+            "repetitions": {
+              "$ref": "#/$defs/PositiveInt",
+              "default": 3
+            },
+            "seed": {
+              "$ref": "#/$defs/NonNegativeInt",
+              "default": 42
+            },
+            "temperature": {
+              "default": 0.0,
+              "maximum": 5.0,
+              "minimum": 0.0,
+              "title": "Temperature",
+              "type": "number"
+            },
+            "top_p": {
+              "$ref": "#/$defs/UnitFraction",
+              "default": 1.0
+            }
+          },
+          "title": "WorkloadSuite",
           "type": "object"
         }
       },

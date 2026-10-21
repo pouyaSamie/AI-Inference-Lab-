@@ -439,6 +439,94 @@ def _strata_pack_dirs(settings: WorkerSettings, roots: tuple[Path, ...], warning
     return packs
 
 
+def _strata_source_shards(pack: Path) -> list[tuple[str, int]]:
+    """Read the read-only source-shard identity emitted by the pack tool."""
+
+    try:
+        payload = json.loads((pack / "conversions.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    shards = payload.get("source_shards")
+    if not isinstance(shards, list):
+        return []
+    result: list[tuple[str, int]] = []
+    for item in shards:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        size = item.get("size")
+        if isinstance(name, str) and name and isinstance(size, int) and size > 0:
+            result.append((name, size))
+    return result
+
+
+def _index_gguf_paths(
+    settings: WorkerSettings, roots: tuple[Path, ...], warnings: list[str]
+) -> dict[str, list[Path]]:
+    index: dict[str, list[Path]] = {}
+    for root in roots:
+        if not root.is_dir():
+            continue
+        try:
+            paths = _walk_files(
+                root,
+                max_depth=settings.max_scan_depth,
+                follow_symlinks=settings.follow_symlinks,
+            )
+        except OSError as exc:
+            warnings.append(f"STRATA_SOURCE_SCAN_FAILED:{root}:{type(exc).__name__}")
+            continue
+        for path in paths:
+            if path.suffix.lower() != ".gguf" or "mmproj" in path.name.lower():
+                continue
+            index.setdefault(path.name, []).append(path)
+    return index
+
+
+def _resolve_strata_source_shards(
+    pack: Path,
+    *,
+    sources: list[tuple[str, int]],
+    gguf_index: dict[str, list[Path]],
+    roots: tuple[Path, ...],
+    warnings: list[str],
+) -> list[tuple[Path, int, int]] | None:
+    """Resolve every source shard without writing to the model tree.
+
+    The pack's ``native_experts.txt`` offsets are relative to the first source
+    GGUF, so that path is emitted first. We require an exact basename and size
+    match for every shard before handing any path to the engine; an ambiguous,
+    missing or changed file is a hard refusal, not a guess.
+    """
+
+    if not sources:
+        warnings.append(f"STRATA_SOURCE_SHARDS_MISSING:{pack.name}")
+        return None
+    resolved: list[tuple[Path, int, int]] = []
+    for index, (name, expected_size) in enumerate(sources, start=1):
+        candidates = sorted(gguf_index.get(name, ()))
+        candidates = [path for path in candidates if _within(path, roots)]
+        if not candidates:
+            warnings.append(f"STRATA_NATIVE_SHARD_NOT_FOUND:{pack.name}:{name}")
+            return None
+        if len(candidates) > 1:
+            warnings.append(f"STRATA_NATIVE_SHARD_AMBIGUOUS:{pack.name}:{name}:{len(candidates)}")
+            return None
+        path = candidates[0]
+        try:
+            size = path.stat().st_size
+        except OSError:
+            warnings.append(f"STRATA_NATIVE_SHARD_UNREADABLE:{pack.name}:{name}")
+            return None
+        if size != expected_size:
+            warnings.append(f"STRATA_NATIVE_SHARD_SIZE_MISMATCH:{pack.name}:{name}:{size}!={expected_size}")
+            return None
+        resolved.append((path, size, index))
+    return resolved
+
+
 def discover_strata_models(
     settings: WorkerSettings,
     *,
@@ -450,6 +538,7 @@ def discover_strata_models(
     warnings = warnings if warnings is not None else []
     roots = roots or settings.resolved_model_roots
     hashing = settings.hashing_enabled if hash_models is None else hash_models
+    gguf_index = _index_gguf_paths(settings, roots, warnings)
     models: list[ModelArtifact] = []
     used_ids: set[str] = set()
     for pack in _strata_pack_dirs(settings, roots, warnings):
@@ -496,12 +585,50 @@ def discover_strata_models(
             )
         if not any(item.path.endswith(("dense.bin", "experts.bin")) for item in files):
             continue
+        source_shards = _strata_source_shards(pack)
+        resolved_shards = _resolve_strata_source_shards(
+            pack,
+            sources=source_shards,
+            gguf_index=gguf_index,
+            roots=roots,
+            warnings=warnings,
+        )
+        native_path: Path | None = None
+        native_sha256: str | None = None
+        native_size: int | None = None
+        if resolved_shards is not None:
+            native_path, native_size, _native_index = resolved_shards[0]
+            for path, size, index in resolved_shards:
+                try:
+                    digest = cache.digest(path) if hashing else None
+                except (OSError, ModelDiscoveryError) as exc:
+                    warnings.append(f"STRATA_NATIVE_HASH_FAILED:{path.name}:{type(exc).__name__}")
+                    digest = None
+                    verified = False
+                sha256 = digest.sha256 if digest else None
+                if index == 1:
+                    native_sha256 = sha256
+                total += size
+                files.append(
+                    ModelFile(
+                        path=str(path),
+                        sha256=sha256,
+                        size_bytes=size,
+                        verified=bool(sha256),
+                        shard_index=index if len(resolved_shards) > 1 else None,
+                        shard_count=len(resolved_shards) if len(resolved_shards) > 1 else None,
+                    )
+                )
         if not hashing or not all(item.verified for item in files):
             verified = False
         metadata = {
             "model_type": "strata-pack",
             "pack_path": str(pack),
             "native": True,
+            "native_shard": str(native_path) if native_path is not None else None,
+            "native_shard_sha256": native_sha256,
+            "native_shard_size_bytes": native_size,
+            "source_shards": [{"name": name, "size": size} for name, size in source_shards],
             "tokenizer_path": str(tokenizer) if tokenizer is not None else None,
             "server_script": settings.strata_server_script,
             "engine_executable": settings.strata_path,

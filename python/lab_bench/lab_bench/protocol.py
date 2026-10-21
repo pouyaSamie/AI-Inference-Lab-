@@ -13,7 +13,16 @@ from dataclasses import dataclass
 from lab_core.ids import sha256_hex, stable_id
 from lab_core.version import WORKLOAD_PROTOCOL
 
-from lab_core import ContextLength, FrozenModel, Identifier, NonEmptyStr, PositiveInt, Sha256, UnitFraction
+from lab_core import (
+    ContextLength,
+    FrozenModel,
+    Identifier,
+    NonEmptyStr,
+    PositiveInt,
+    Sha256,
+    UnitFraction,
+    WorkloadSuite,
+)
 
 CONTEXT_MATRIX: tuple[ContextLength, ...] = (
     ContextLength.K4,
@@ -111,6 +120,50 @@ def plan_workloads(
         case.validate_case()
         cases.append(case)
     return tuple(cases)
+
+
+def plan_workload_suite(
+    context: ContextLength,
+    suite: WorkloadSuite,
+    *,
+    tokenizer_id: str | None = None,
+) -> tuple[WorkloadCase, ...]:
+    """Plan a controller-owned workload suite for one candidate context.
+
+    The suite's dataset, fractions, output cap, seed and protocol are preserved
+    in each case. Token counting is still a worker responsibility.
+    """
+
+    config = ProtocolConfig(
+        protocol=suite.protocol,
+        fractions=suite.prompt_levels,
+        output_tokens=suite.output_tokens,
+    )
+    cases = plan_workloads(
+        context,
+        config=config,
+        tokenizer_id=tokenizer_id,
+        seed=suite.seed,
+    )
+    for case in cases:
+        case.validate_case()
+    return cases
+
+
+def primary_case(cases: tuple[WorkloadCase, ...], *, preferred_fraction: float = 0.85) -> WorkloadCase:
+    """Choose the comparable primary load without mixing unlike prompt sizes."""
+
+    if not cases:
+        raise ProtocolViolation("at least one workload case is required")
+    below = [case for case in cases if case.prompt_fraction < 0.95]
+    pool = below or list(cases)
+    return min(pool, key=lambda case: (abs(case.prompt_fraction - preferred_fraction), case.prompt_fraction))
+
+
+def near_capacity_case(cases: tuple[WorkloadCase, ...]) -> WorkloadCase:
+    if not cases:
+        raise ProtocolViolation("at least one workload case is required")
+    return max(cases, key=lambda case: case.prompt_fraction)
 
 
 def workload_digest(
