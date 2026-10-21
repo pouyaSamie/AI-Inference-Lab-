@@ -34,6 +34,7 @@ from lab_core import (
     PlanStatus,
     PreflightPayload,
     WorkerSnapshot,
+    finalize_experiment,
 )
 
 from ..config import Settings
@@ -212,7 +213,10 @@ def create_experiment(
         study_name=f"{experiment_id}:{spec.spec_digest[:16]}",
         state="pending",
         search_space_json=search_space.model_dump(mode="json"),
-        maximum_trials=spec.search_policy.max_candidates or 1,
+        # One fixed-default baseline per selected context is required before
+        # candidates can be compared. Baselines are not TPE search proposals,
+        # so they do not consume the distinct-candidate search budget.
+        maximum_trials=(spec.search_policy.max_candidates or 1) + len(spec.contexts),
         proposal_attempts=0,
         seed=spec.search_policy.seed,
         objective=spec.objective.value,
@@ -466,7 +470,13 @@ def experiment_results(session: Session, experiment_id: str) -> ExperimentResult
         if value is not None and value > best_value:
             best_value = value
             best_id = candidate.candidate_id
-    warnings = list(view.warnings)
+    finalization = finalize_experiment(
+        experiment_id=experiment_id,
+        spec=view.spec,
+        candidates=view.candidates,
+        observations=view.observations,
+    )
+    warnings = [*view.warnings, *finalization.warnings]
     if view.simulation:
         warnings.append("SIMULATED_RESULTS_NOT_VALIDATED_FOR_DEPLOYMENT")
     return ExperimentResultsResponse(
@@ -475,7 +485,9 @@ def experiment_results(session: Session, experiment_id: str) -> ExperimentResult
         candidates=view.candidates,
         observations=view.observations,
         best_candidate_id=best_id,
+        validated_winner_candidate_id=finalization.validated_winner_candidate_id,
+        finalization=finalization,
         simulated=view.simulation,
         warnings=tuple(dict.fromkeys(warnings)),
-        phase="phase-1-screening",
+        phase="phase-5-finalization",
     )

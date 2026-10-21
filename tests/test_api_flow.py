@@ -74,15 +74,21 @@ def test_plan_create_optimize_and_reject_simulated_recipe(
         assert view["status"]["state"] == "completed", view["status"]
         assert view["simulation"] is True
         assert view["candidates"]
+        assert any(item["role"] == "baseline" for item in view["candidates"])
         assert view["observations"]
         assert all(item["simulated"] is True for item in view["observations"])
         assert all(item["measurement_status"] == "simulated" for item in view["observations"])
+        assert all(item["repetitions"] == 3 for item in view["observations"])
+        assert all(len(item["samples"]) == 3 for item in view["observations"])
 
         results = client.get(f"/api/v1/experiments/{experiment_id}/results")
         assert results.status_code == 200, results.text
         result_body = results.json()
         assert result_body["simulated"] is True
         assert result_body["best_candidate_id"]
+        assert result_body["validated_winner_candidate_id"] is None
+        assert result_body["finalization"]["classification"] == "SIMULATED"
+        assert result_body["finalization"]["per_context"][0]["winner_candidate_id"] is None
 
         recipe = client.post(
             "/api/v1/recipes",
@@ -130,6 +136,129 @@ def test_plan_create_optimize_and_reject_simulated_recipe(
         gap_events = asyncio.run(_stream_events(controller, experiment_id, last_event_id=1))
         assert gap_events[0] == "event.gap"
         assert gap_events[1] == "snapshot"
+
+
+def test_qualified_measured_evidence_builds_a_validated_recipe(
+    controller: ControllerHandle,
+    simulated_worker,
+    optimizer,
+) -> None:
+    """Exercise the full gate with synthetic *measured* rows after a simulated run.
+
+    This is still offline test data, not engine evidence. It proves that the
+    controller-side qualification and recipe path can succeed when every
+    required condition is present.
+    """
+
+    from lab_api.orm import CandidateRow, ObservationRow
+
+    from lab_core import (
+        BenchmarkObservation,
+        CandidateRole,
+        EvidenceKind,
+        MeasurementStatus,
+        QualityGate,
+        QualityGateStatus,
+        stable_id,
+    )
+
+    with httpx.Client(
+        base_url=controller.base_url,
+        headers=controller.operator_headers,
+        timeout=10.0,
+    ) as client:
+        plan = client.post(
+            "/api/v1/experiments/plan",
+            json=plan_body(max_candidates=2),
+        ).json()["plan"]
+        experiment_id = client.post(
+            "/api/v1/experiments",
+            headers={"Idempotency-Key": "create-qualified-1"},
+            json={"plan": plan},
+        ).json()["status"]["experiment_id"]
+
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            status = client.get(f"/api/v1/experiments/{experiment_id}").json()["status"]
+            if status["state"] in TERMINAL:
+                break
+            time.sleep(0.1)
+        assert status["state"] == "completed", status
+
+    with controller.session_factory() as session:
+        candidate_rows = session.query(CandidateRow).filter_by(experiment_id=experiment_id).all()
+        candidates = {row.candidate_id: CandidateRole(row.payload_json["role"]) for row in candidate_rows}
+        observation_rows = session.query(ObservationRow).filter_by(experiment_id=experiment_id).all()
+        assert len(observation_rows) == len(candidate_rows)
+        for row in observation_rows:
+            observation = BenchmarkObservation.model_validate(row.payload_json)
+            role = candidates[observation.candidate_id]
+            scale = 1.5 if role is CandidateRole.CANDIDATE else 1.0
+            metrics = observation.metrics.model_copy(
+                update={
+                    "prefill_tokens_per_sec": observation.metrics.prefill_tokens_per_sec * scale,
+                    "decode_tokens_per_sec": observation.metrics.decode_tokens_per_sec * scale,
+                }
+            )
+            samples = tuple(
+                sample.model_copy(
+                    update={
+                        "prefill_tokens_per_sec": sample.prefill_tokens_per_sec * scale,
+                        "decode_tokens_per_sec": sample.decode_tokens_per_sec * scale,
+                    }
+                )
+                for sample in observation.samples
+            )
+            retained_gates = tuple(
+                gate
+                for gate in observation.quality_gates
+                if gate.name not in {"context_truncation", "planned_prompt_tokens"}
+            )
+            gates = (
+                *retained_gates,
+                QualityGate(name="context_truncation", status=QualityGateStatus.PASSED),
+                QualityGate(name="planned_prompt_tokens", status=QualityGateStatus.PASSED),
+            )
+            measured = observation.model_copy(
+                update={
+                    "observation_id": stable_id(
+                        "obs",
+                        observation.candidate_id,
+                        observation.attempt,
+                        EvidenceKind.SERVER_API.value,
+                        int(observation.context),
+                    ),
+                    "simulated": False,
+                    "evidence_kind": EvidenceKind.SERVER_API,
+                    "measurement_status": MeasurementStatus.MEASURED,
+                    "metrics": metrics,
+                    "samples": samples,
+                    "quality_gates": gates,
+                }
+            )
+            row.simulated = False
+            row.evidence_kind = EvidenceKind.SERVER_API.value
+            row.measurement_status = MeasurementStatus.MEASURED.value
+            row.payload_json = measured.model_dump(mode="json")
+        session.commit()
+        candidate_id = next(
+            candidate_id for candidate_id, role in candidates.items() if role is CandidateRole.CANDIDATE
+        )
+
+    with httpx.Client(
+        base_url=controller.base_url,
+        headers=controller.operator_headers,
+        timeout=10.0,
+    ) as client:
+        response = client.post(
+            "/api/v1/recipes",
+            headers={"Idempotency-Key": "recipe-qualified-1"},
+            json={"experiment_id": experiment_id, "candidate_id": candidate_id},
+        )
+        assert response.status_code == 201, response.text
+        recipe = response.json()
+        assert recipe["status"] == "validated"
+        assert recipe["recipe"]["validation"]["confidence_ref"]
 
 
 def test_plan_requires_preflight_for_missing_inventory(controller: ControllerHandle) -> None:

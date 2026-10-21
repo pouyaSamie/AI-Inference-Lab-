@@ -51,6 +51,9 @@ class AskPayload(FrozenModel):
     study_name: NonEmptyStr
     context_tokens: PositiveInt
     workload_digest: Sha256
+    # Baseline asks return the adapter's documented defaults instead of a TPE
+    # sample. The paired baseline is required before a candidate can qualify.
+    baseline: bool = False
     attempt_limit: PositiveInt = 32
 
 

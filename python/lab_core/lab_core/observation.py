@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from pydantic import Field, model_validator
 
 from .base import (
@@ -81,6 +83,32 @@ class BenchMetrics(FrozenModel):
         return [name for name in required if getattr(self, name) is None]
 
 
+class BenchSample(FrozenModel):
+    """One primary-level repeat retained for paired bootstrap confidence.
+
+    The observation's ``metrics`` remain the robust summary shown to operators.
+    These samples are the raw comparable repeats used by finalization; they are
+    never merged across prompt loads.
+    """
+
+    prefill_tokens_per_sec: float
+    decode_tokens_per_sec: float
+    time_to_first_token_ms: float | None = None
+    total_latency_ms: float | None = None
+
+    @model_validator(mode="after")
+    def _positive_throughput(self) -> BenchSample:
+        for name in ("prefill_tokens_per_sec", "decode_tokens_per_sec"):
+            value = getattr(self, name)
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be finite and positive")
+        for name in ("time_to_first_token_ms", "total_latency_ms"):
+            value = getattr(self, name)
+            if value is not None and (not math.isfinite(value) or value < 0):
+                raise ValueError(f"{name} must be finite and non-negative")
+        return self
+
+
 class TelemetryCoverage(FrozenModel):
     source: NonEmptyStr = "none"
     sample_interval_ms: PositiveInt | None = None
@@ -138,6 +166,7 @@ class BenchmarkObservation(FrozenModel):
     input_tokens: int | None = None
     output_tokens: int | None = None
     repetitions: PositiveInt = 1
+    samples: tuple[BenchSample, ...] = ()
     dispersion: dict[str, float] = Field(default_factory=dict)
     telemetry: TelemetryCoverage = Field(default_factory=TelemetryCoverage)
     quality_gates: tuple[QualityGate, ...] = ()

@@ -1,11 +1,13 @@
-# Architecture — Phase 0/1 foundation, Phase 2 worker, Phase 3 adapters, Phase 4 workloads
+# Architecture — Phase 0/1 foundation, Phase 2 worker, Phase 3 adapters, Phase 4 workloads, Phase 5 finalization
 
 Status: Phase 1 is complete and verified. Phase 2 adds a production Linux worker
 with observed engine/model discovery, native process execution, GPU UUID leases,
 journals, sandboxes and a real executor. Phase 3 productionizes the two adapters
 against the installed llama.cpp and Strata builds and adds offline conformance
-tests. The simulated lane remains separate and its evidence can never qualify a
-recipe.
+tests. Phase 4 adds tokenizer-backed workloads and Strata source-shard identity.
+Phase 5 adds paired baselines, retained primary samples and deterministic
+statistical finalization. The simulated lane remains separate and its evidence
+can never qualify a recipe.
 
 ## 1. Process topology
 
@@ -45,7 +47,7 @@ controller needs no inbound route to a worker.
 
 | Package | Responsibility | Must not |
 |---|---|---|
-| `lab_core` | frozen Pydantic models, canonical JSON/hash, enums, state transitions, scoring primitives | perform I/O, import FastAPI/Optuna, hold process handles |
+| `lab_core` | frozen Pydantic models, canonical JSON/hash, enums, state transitions, objective scoring, paired bootstrap and finalization | perform I/O, import FastAPI/Optuna, hold process handles |
 | `lab_bench` | deterministic context/workload matrix and normalization | launch engines or read prompt corpora |
 | `lab_adapters` | pure CLI/JSON translation, capability parsing, candidate validation, execution-plan construction | subprocess, network, filesystem, hardware probe |
 | `lab_api` | FastAPI, auth, persistence, planning, lifecycle, command queue, optimizer outbox, SSE, migrations | import Optuna, run benchmark work on the event loop |
@@ -321,13 +323,46 @@ Recovery rules:
   changed shards produce a warning and no `--native` argument. Only the first
   resolved shard becomes `--native SHARD1`; `native: true` is never a path.
 
-## 14. Phase boundary
+## 14. Statistical finalization (Phase 5)
+
+- **Paired baseline first.** The controller asks one fixed-default baseline for
+  each selected context before normal TPE proposals. `AskPayload.baseline`
+  selects `_defaults()` in the optimizer; the candidate is persisted with
+  `role=baseline`. Baselines do not consume the distinct-candidate budget.
+- **Comparable samples.** Every completed primary-level repeat is retained as a
+  `BenchSample`; prompt loads are never merged. Observations remain the source
+  of truth, and finalization is recomputed from stored observations rather than
+  trusted from a worker summary.
+- **Objective-relative optimisation.** A candidate `tell` value is the PRD
+  objective ratio against its paired baseline (balanced geometric mean of
+  prefill and decode ratios), so TPE does not confuse different context sizes
+  with better configurations.
+- **Deterministic confidence.** `paired_ratio_ci` performs a seeded percentile
+  bootstrap over paired objective ratios. The default gate requires at least a
+  5% score improvement and a 95% interval strictly above 1.0, with no failed
+  guardrail.
+- **Complete coverage.** Per-context winners are qualified independently.
+  Cross-context aggregation uses the geometric mean over exactly the selected
+  contexts; a missing context makes the candidate ineligible for a global
+  winner. Results explicitly classify `VALIDATED_WINNER`,
+  `NO_VALIDATED_WINNER` or `SIMULATED`.
+- **Recipe gate.** Recipe creation recomputes finalization. It rejects
+  simulated, screening-only, native-only, baseline, unpaired, sample-incomplete
+  and non-qualified candidates with `409`. Accepted recipes are stored with
+  `status=validated`; approval, verification and promotion remain separate
+  guarded actions.
+- **Honesty boundary.** No real baseline/candidate pair has been collected, so
+  the finalization path is verified offline only. Simulation still produces a
+  `SIMULATED` classification and no validated recipe.
+
+## 15. Phase boundary
 
 Phases 0/1 prove protocol, persistence, planning, lifecycle, recovery and
 pure-adapter behavior. Phase 2 proves the worker-owned process, discovery, GPU
 lease and command execution machinery. Phase 3 proves adapter conformance
 against the installed help/version/evidence fixtures and the observed live
 surface. Phase 4 adds tokenizer-backed workload lanes and read-only Strata
-source-shard identity; it does **not** prove real llama.cpp/Strata performance,
-quality, statistical finalization or validated recipes until an approved run
-produces evidence. Phase 5 adds search/finalization; Phase 6 adds the UI.
+source-shard identity. Phase 5 adds paired baselines, retained samples,
+statistical finalization and the recipe qualification gate; it does **not**
+prove real llama.cpp/Strata performance or create a real validated recipe until
+an approved run produces evidence. Phase 6 adds the UI.

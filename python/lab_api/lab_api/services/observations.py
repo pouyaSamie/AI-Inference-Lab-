@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 from lab_core import (
     BenchmarkObservation,
+    CandidateRole,
+    CandidateSpec,
     CandidateState,
     EventType,
     FeasibilityOutcome,
@@ -21,6 +23,7 @@ from lab_core import (
     OptimizerRequestKind,
     TellPayload,
     TrialTellState,
+    score_against_baseline,
 )
 
 from ..config import Settings
@@ -47,6 +50,72 @@ def _screening_value(objective: Objective, observation: BenchmarkObservation) ->
     if value is None or not math.isfinite(value) or value <= 0:
         return None
     return value
+
+
+def _baseline_observation(
+    session: Session,
+    *,
+    study_id: str,
+    context: int,
+) -> BenchmarkObservation | None:
+    rows = session.scalars(
+        select(CandidateRow).where(
+            CandidateRow.study_id == study_id,
+            CandidateRow.context_tokens == context,
+        )
+    ).all()
+    baseline_ids = [
+        row.candidate_id
+        for row in rows
+        if CandidateSpec.model_validate(row.payload_json).role is CandidateRole.BASELINE
+    ]
+    if not baseline_ids:
+        return None
+    observations = session.scalars(
+        select(ObservationRow).where(ObservationRow.candidate_id.in_(baseline_ids))
+    ).all()
+    for row in observations:
+        observation = BenchmarkObservation.model_validate(row.payload_json)
+        if observation.scoring_eligibility():
+            continue
+        if observation.metrics.prefill_tokens_per_sec and observation.metrics.decode_tokens_per_sec:
+            return observation
+    return None
+
+
+def _optimizer_value(
+    session: Session,
+    experiment: ExperimentRow,
+    candidate_row: CandidateRow,
+    observation: BenchmarkObservation,
+) -> float | None:
+    candidate = CandidateSpec.model_validate(candidate_row.payload_json)
+    if candidate.role is CandidateRole.BASELINE:
+        return 1.0
+    raw = _screening_value(Objective(experiment.objective), observation)
+    baseline = _baseline_observation(
+        session,
+        study_id=candidate_row.study_id,
+        context=int(candidate.context),
+    )
+    if (
+        baseline is None
+        or baseline.metrics.prefill_tokens_per_sec is None
+        or baseline.metrics.decode_tokens_per_sec is None
+        or observation.metrics.prefill_tokens_per_sec is None
+        or observation.metrics.decode_tokens_per_sec is None
+    ):
+        return raw
+    try:
+        return score_against_baseline(
+            Objective(experiment.objective),
+            baseline_prefill_tokens_per_sec=baseline.metrics.prefill_tokens_per_sec,
+            baseline_decode_tokens_per_sec=baseline.metrics.decode_tokens_per_sec,
+            candidate_prefill_tokens_per_sec=observation.metrics.prefill_tokens_per_sec,
+            candidate_decode_tokens_per_sec=observation.metrics.decode_tokens_per_sec,
+        ).score
+    except ValueError:
+        return raw
 
 
 def _candidate_state(observation: BenchmarkObservation) -> CandidateState:
@@ -166,7 +235,8 @@ def commit_observation(
         },
     )
 
-    value = _screening_value(Objective(experiment.objective), observation)
+    value = _optimizer_value(session, experiment, candidate, observation)
+    candidate_spec = CandidateSpec.model_validate(candidate.payload_json)
     if observation.status is ObservationStatus.COMPLETED and value is not None:
         tell = TellPayload(
             study_id=study.study_id,
@@ -176,7 +246,11 @@ def commit_observation(
             state=TrialTellState.COMPLETE,
             value=value,
             feasibility=FeasibilityOutcome.FEASIBLE,
-            reason="Phase 1 screening value from simulated/measured throughput",
+            reason=(
+                "objective score relative to the paired baseline"
+                if candidate_spec.role is not CandidateRole.BASELINE
+                else "paired baseline reference value"
+            ),
         )
     else:
         failure_kind = observation.failure.kind.value if observation.failure else observation.status.value

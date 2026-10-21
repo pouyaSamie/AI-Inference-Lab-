@@ -1,6 +1,6 @@
 # AGENTS.md — working rules for this repository
 
-This repository is the Phase 0/1/2/3/4 foundation of **AI Inference Optimization Lab**.
+This repository is the Phase 0/1/2/3/4/5 foundation of **AI Inference Optimization Lab**.
 The authoritative product contract is [`docs/prd.md`](docs/prd.md) (PRD v2.1).
 When code and prose disagree, the PRD and the frozen `lab_core` models win.
 
@@ -18,14 +18,16 @@ Implemented now:
 - real Linux worker: observed engine/model discovery, SHA-256 hash cache, hardware telemetry, sandboxes, journal, GPU UUID `flock` leases, argv-only process runner, crash recovery and real executor;
 - frozen `lab-synthetic-v1` corpus, iterative tokenizer fitting and a prompt-level serving ladder with repeated-primary medians and near-capacity context checks;
 - read-only Strata source-shard resolution from `conversions.json` with exact basename/size checks and hashing when enabled;
+- one fixed-default paired baseline per selected context, retained `BenchSample`s and objective-relative optimizer values;
+- deterministic finalization with paired percentile bootstrap, per-context winners, complete-coverage cross-context ranking and the >=5% / 95% recipe gate;
 - explicit **simulated** worker executor and end-to-end tests;
 - deterministic OpenAPI/JSON-Schema/TypeScript contract generation;
 - systemd unit files and deployment documentation (authoring only, not installed).
 
-Intentionally deferred: statistical finalization, recipes from real evidence,
-Electron/React UI, release intelligence and production systemd installation.
-Strata full-context proof remains `INCONCLUSIVE` until a real approved serving
-run; the installed build lacks calibration commands.
+Intentionally deferred: recipes from real evidence, Electron/React UI, release
+intelligence and production systemd installation. Strata full-context proof
+remains `INCONCLUSIVE` until a real approved serving run; the installed build
+lacks calibration commands.
 
 ## Non-negotiable invariants
 
@@ -34,8 +36,9 @@ run; the installed build lacks calibration commands.
    `lab-worker` is the real lane and emits only `simulated=false` observations.
    Simulated evidence can never produce a validated recipe;
    `POST /api/v1/recipes` must return `409` for it. Real evidence that is
-   `screening_only`, character-fallback, or missing required metrics cannot
-   qualify a recipe either.
+   `screening_only`, character-fallback, native-only, missing required metrics,
+   missing an eligible paired baseline or missing retained primary samples
+   cannot qualify a recipe either.
 2. **Never run Optuna in FastAPI.** `lab_api` writes durable optimizer requests
    to the controller store. `lab_optimizer` owns `study.ask/tell`, Optuna
    `RDBStorage` and its own database. No controller module may import Optuna.
@@ -59,7 +62,12 @@ run; the installed build lacks calibration commands.
 9. **Generated contracts are checked in.** Pydantic/FastAPI are the only
    contract source. `scripts/check_contracts.py` is the CI drift gate; do not
    hand-edit `contracts/` or `packages/client-contracts/src/openapi-types.ts`.
-10. **`attic/` is archival.** Do not import, format, modify or activate anything
+10. **Qualification is explicit.** A candidate is never a winner because it has
+    the highest throughput. It must beat a same-context paired baseline by the
+    declared margin, with a confidence interval strictly above baseline and no
+    guardrail failure. Missing samples or contexts make it ineligible, never a
+    silent pass. Cross-context aggregation requires the complete selected set.
+11. **`attic/` is archival.** Do not import, format, modify or activate anything
     under `attic/`. It records an abandoned parallel draft only.
 
 ## Required commands

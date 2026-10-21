@@ -14,7 +14,7 @@ from .base import (
     Sha256,
     parameters_digest,
 )
-from .enums import CandidateState, ContextLength
+from .enums import CandidateRole, CandidateState, ContextLength
 from .ids import sha256_hex, stable_id
 from .version import SCHEMA_VERSION
 
@@ -37,6 +37,7 @@ class CandidateSpec(FrozenModel):
     model_digest: Sha256
     worker_id: Identifier
     context: ContextLength
+    role: CandidateRole = CandidateRole.CANDIDATE
     parameters: Parameters = Field(default_factory=dict)
     parameter_digest: Sha256 | None = None
     workload_digest: Sha256

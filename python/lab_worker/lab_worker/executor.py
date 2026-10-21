@@ -17,6 +17,7 @@ from lab_core.ids import canonical_json, sha256_text
 from lab_core import (
     BenchmarkObservation,
     BenchMetrics,
+    BenchSample,
     CancelPayload,
     CancelResult,
     ClaimTrialPayload,
@@ -322,8 +323,26 @@ class SimulatedExecutor:
         decode = 95.0 * context_factor * layer_factor * thread_factor * cache_factor * flash_factor * jitter
         input_tokens = min(context, 2048)
         output_tokens = 256
-        ttft_ms = 20.0 + (input_tokens / max(prefill, 1.0)) * 1000.0
-        total_ms = ttft_ms + (output_tokens / max(decode, 1.0)) * 1000.0
+        repetitions = max(1, payload.workload.repetitions if payload.workload else 1)
+        samples: list[BenchSample] = []
+        for index in range(repetitions):
+            # A deterministic, symmetric spread keeps the simulated median
+            # stable while still exercising paired-bootstrap paths.
+            spread = (index - (repetitions - 1) / 2.0) * 0.008
+            sample_prefill = prefill * (1.0 + spread)
+            sample_decode = decode * (1.0 - spread)
+            sample_ttft = 20.0 + (input_tokens / max(sample_prefill, 1.0)) * 1000.0
+            sample_total = sample_ttft + (output_tokens / max(sample_decode, 1.0)) * 1000.0
+            samples.append(
+                BenchSample(
+                    prefill_tokens_per_sec=round(sample_prefill, 3),
+                    decode_tokens_per_sec=round(sample_decode, 3),
+                    time_to_first_token_ms=round(sample_ttft, 3),
+                    total_latency_ms=round(sample_total, 3),
+                )
+            )
+        ttft_ms = samples[0].time_to_first_token_ms or 0.0
+        total_ms = samples[0].total_latency_ms or 0.0
         vram = 3_800_000_000 + context * 75_000
         quality_gates: tuple[QualityGate, ...] = (
             QualityGate(
@@ -381,7 +400,8 @@ class SimulatedExecutor:
             effective_context=context,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            repetitions=1,
+            repetitions=len(samples),
+            samples=tuple(samples),
             dispersion={"decode_tokens_per_sec": 0.02, "prefill_tokens_per_sec": 0.02},
             telemetry=TelemetryCoverage(
                 source="simulated",

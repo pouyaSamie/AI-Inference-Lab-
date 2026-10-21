@@ -175,6 +175,11 @@ class AckDisposition(StrEnum):
     REJECTED = "rejected"
 
 
+class CandidateRole(StrEnum):
+    BASELINE = "baseline"
+    CANDIDATE = "candidate"
+
+
 class CandidateState(StrEnum):
     PROPOSED = "proposed"
     CLAIMED = "claimed"

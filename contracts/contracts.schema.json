@@ -238,6 +238,50 @@
           "title": "BenchMetrics",
           "type": "object"
         },
+        "BenchSample": {
+          "additionalProperties": false,
+          "description": "One primary-level repeat retained for paired bootstrap confidence.\n\nThe observation's ``metrics`` remain the robust summary shown to operators.\nThese samples are the raw comparable repeats used by finalization; they are\nnever merged across prompt loads.",
+          "properties": {
+            "decode_tokens_per_sec": {
+              "title": "Decode Tokens Per Sec",
+              "type": "number"
+            },
+            "prefill_tokens_per_sec": {
+              "title": "Prefill Tokens Per Sec",
+              "type": "number"
+            },
+            "time_to_first_token_ms": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Time To First Token Ms"
+            },
+            "total_latency_ms": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Total Latency Ms"
+            }
+          },
+          "required": [
+            "prefill_tokens_per_sec",
+            "decode_tokens_per_sec"
+          ],
+          "title": "BenchSample",
+          "type": "object"
+        },
         "ContextLength": {
           "enum": [
             4096,
@@ -692,6 +736,14 @@
           "$ref": "#/$defs/PositiveInt",
           "default": 1
         },
+        "samples": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/BenchSample"
+          },
+          "title": "Samples",
+          "type": "array"
+        },
         "schema_version": {
           "$ref": "#/$defs/NonEmptyStr",
           "default": "1.0.0"
@@ -740,6 +792,14 @@
     },
     "CandidateSpec": {
       "$defs": {
+        "CandidateRole": {
+          "enum": [
+            "baseline",
+            "candidate"
+          ],
+          "title": "CandidateRole",
+          "type": "string"
+        },
         "CandidateState": {
           "enum": [
             "proposed",
@@ -855,6 +915,10 @@
         },
         "parameters": {
           "$ref": "#/$defs/Parameters"
+        },
+        "role": {
+          "$ref": "#/$defs/CandidateRole",
+          "default": "candidate"
         },
         "schema_version": {
           "$ref": "#/$defs/NonEmptyStr",
@@ -1191,6 +1255,50 @@
           "title": "BenchMetrics",
           "type": "object"
         },
+        "BenchSample": {
+          "additionalProperties": false,
+          "description": "One primary-level repeat retained for paired bootstrap confidence.\n\nThe observation's ``metrics`` remain the robust summary shown to operators.\nThese samples are the raw comparable repeats used by finalization; they are\nnever merged across prompt loads.",
+          "properties": {
+            "decode_tokens_per_sec": {
+              "title": "Decode Tokens Per Sec",
+              "type": "number"
+            },
+            "prefill_tokens_per_sec": {
+              "title": "Prefill Tokens Per Sec",
+              "type": "number"
+            },
+            "time_to_first_token_ms": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Time To First Token Ms"
+            },
+            "total_latency_ms": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Total Latency Ms"
+            }
+          },
+          "required": [
+            "prefill_tokens_per_sec",
+            "decode_tokens_per_sec"
+          ],
+          "title": "BenchSample",
+          "type": "object"
+        },
         "BenchmarkObservation": {
           "additionalProperties": false,
           "description": "Immutable normalized evidence for one candidate/context/attempt.\n\n``observation_id`` is deterministic over candidate, attempt, evidence\nlane and context. The controller uses it as the idempotency key for\nduplicate worker completions.",
@@ -1330,6 +1438,14 @@
             "repetitions": {
               "$ref": "#/$defs/PositiveInt",
               "default": 1
+            },
+            "samples": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/BenchSample"
+              },
+              "title": "Samples",
+              "type": "array"
             },
             "schema_version": {
               "$ref": "#/$defs/NonEmptyStr",
@@ -5982,6 +6098,11 @@
               "$ref": "#/$defs/PositiveInt",
               "default": 32
             },
+            "baseline": {
+              "default": false,
+              "title": "Baseline",
+              "type": "boolean"
+            },
             "context_tokens": {
               "$ref": "#/$defs/PositiveInt"
             },
@@ -6598,6 +6719,11 @@
             "attempt_limit": {
               "$ref": "#/$defs/PositiveInt",
               "default": 32
+            },
+            "baseline": {
+              "default": false,
+              "title": "Baseline",
+              "type": "boolean"
             },
             "context_tokens": {
               "$ref": "#/$defs/PositiveInt"

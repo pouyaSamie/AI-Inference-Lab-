@@ -21,14 +21,14 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 | Real Linux worker | Implemented | Observed engine/model discovery, hardware/GPU telemetry, SHA-256 cache, sandboxes, journal, GPU UUID `flock` leases, argv-only runner, crash recovery, cancellation. |
 | Real command handlers | Implemented | `SCAN`, `PREFLIGHT`, `CLAIM_TRIAL`, `PAUSE`, `CANCEL`, `VERIFY_RECIPE`; `PROMOTE` is dry-run/idempotent only. |
 | Phase 1 execution lane | Explicitly simulated | `lab-worker-sim` emits `simulated=true` and `measurement_status=simulated` only. |
-| Real execution lane | Implemented, not fully exercised | `lab-worker` emits only `simulated=false`. Live inventory/scan smoke passed; no real preflight or trial was run yet. Trials now run a tokenizer-backed workload ladder and near-capacity context check when a server is available. |
-| Recipe validation | Implemented, rejects simulation | Simulated evidence returns `409`; incomplete/screening-only real evidence cannot qualify. |
+| Real execution lane | Implemented, not fully exercised | `lab-worker` emits only `simulated=false`. Live inventory/scan smoke passed; no real preflight or trial was run yet. Trials run a tokenizer-backed workload ladder, retain primary-level samples and perform a near-capacity context check when a server is available. |
+| Statistical finalization | Implemented, verified offline | A fixed-default baseline is asked once per selected context before TPE candidates. Primary-level repeats are retained as `BenchSample`s. Finalization computes the PRD objective ratio, paired percentile bootstrap interval and the >=5% / 95% qualification gate, with per-context and complete-coverage cross-context rankings. |
+| Recipe qualification | Implemented, rejects simulation and inconclusive evidence | Simulated or screening-only evidence returns `409`. Measured evidence must also have an eligible paired baseline, retained samples and a qualification decision before a recipe is built; accepted recipes are marked `validated`. No real recipe exists yet. |
 | SSE | Implemented | Initial `snapshot`, sequenced events, `event.gap` for stale `Last-Event-ID`, bounded page endpoint. |
 | Generated contracts | Implemented, checked in | OpenAPI, JSON Schema/manifest and strict TypeScript declarations; offline generation and drift gate. |
 | systemd packaging | Authored, not installed | Three service units plus an environment template and security notes under `packaging/systemd/`. |
 | Electron/React UI | Not implemented | Phase 6. |
 | Tokenizer-backed workloads | Implemented, offline | Frozen `lab-synthetic-v1` corpus, engine tokenizer fitting, prompt-level ladder, repeated-primary medians and near-capacity truncation checks. No live serving run yet. |
-| Statistical finalization / validated recipes | Not implemented | Phase 5. No validated real recipe exists. |
 | Update intelligence / release qualification | Not implemented | Phase 7/8. |
 
 ## 2. Runtime components
@@ -105,6 +105,29 @@ It is not a roadmap and does not upgrade reconnaissance into benchmark evidence.
 - Real observations always have `simulated=false`; simulation can never produce
   a validated recipe.
 
+### Statistical finalization
+
+- The scheduler asks one fixed-default `BASELINE` candidate for every selected
+  context before normal TPE candidates. Baseline asks use the adapter's
+  documented defaults; they are not TPE proposals and do not consume the
+  distinct-candidate search budget.
+- The worker retains every completed primary-level repeat as a `BenchSample`.
+  Simulation emits deterministic labelled samples but remains non-promotable.
+- Candidate `tell` values are objective scores relative to the paired baseline
+  rather than raw throughput at different contexts.
+- `lab_core.finalization` recomputes evidence from stored observations. It uses
+  paired sample ratios, a deterministic percentile bootstrap and the declared
+  gate (default >=5% improvement and a 95% interval strictly above baseline).
+- Results expose per-context evaluations, `VALIDATED_WINNER`,
+  `NO_VALIDATED_WINNER` or `SIMULATED`, and cross-context rankings that require
+  the complete selected context set.
+- `POST /api/v1/recipes` recomputes finalization and returns `409` unless the
+  candidate is measured, baseline-paired, sample-complete and qualified.
+  Candidate recipes are stored with `status=validated`; promotion remains a
+  separate guarded action.
+- Simulated, character-fallback, screening-only, native-only and
+  hash-incomplete evidence remain ineligible.
+
 ## 4. Verification actually performed
 
 The following commands were run in this workspace on 2026-10-21 and produced the
@@ -115,13 +138,13 @@ uv run ruff check
 # All checks passed!
 
 uv run ruff format --check
-# 108 files already formatted
+# 110 files already formatted
 
 uv run mypy python
-# Success: no issues found in 91 source files
+# Success: no issues found in 92 source files
 
 uv run pytest -q
-# 42 passed in 8.10s
+# 49 passed in 10.49s
 
 uv run python scripts/check_contracts.py
 # contracts are current
@@ -199,7 +222,12 @@ crash recovery. Phase 3 adds offline golden conformance tests for installed
 llama.cpp server/bench output, Strata stderr help/status output, typed candidate
 rejection, profile de-duplication and generated-file digest checks. Phase 4
 adds offline corpus/tokenizer tests, workload-suite median and context-rejection
-coverage, and two-shard Strata source resolution tests. No test requires a GPU,
+coverage, and two-shard Strata source resolution tests. Phase 5 adds offline
+paired-bootstrap, qualification/no-winner, incomplete-coverage, simulated
+rejection and baseline-default tests, plus end-to-end simulated assertions for
+baseline scheduling and non-promotable finalization. A synthetic measured
+baseline/candidate pair is also driven through the full recipe endpoint to prove
+the accepted `validated` path; it is test data, not engine evidence. No test requires a GPU,
 downloaded weights, a live engine or external network access.
 
 ## 5. What is not proven
@@ -213,6 +241,11 @@ These are intentional boundaries, not hidden gaps:
   llama.cpp tokenizer routes and Strata `count_tokens` endpoint are covered
   offline, not by a real request.
 - No real 4K/32K/128K latency, VRAM, quality or thermal measurement exists.
+- No real baseline/candidate pair has been collected, so statistical
+  finalization and recipe qualification are proven by offline tests only. There
+  is no validated real recipe.
+- The simulated end-to-end run classifies its finalization as `SIMULATED` and
+  exposes no winner even though it now schedules a baseline and retains samples.
 - No second GPU (for example L40S) comparison exists; only the RTX 3060 is
   installed.
 - Strata full-context proof is `INCONCLUSIVE` until a real approved serving run.

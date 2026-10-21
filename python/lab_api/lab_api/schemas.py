@@ -20,6 +20,7 @@ from lab_core import (
     ExperimentPlan,
     ExperimentSpec,
     ExperimentStatusView,
+    FinalizationResult,
     FrozenModel,
     HardwareSnapshot,
     Identifier,
@@ -112,9 +113,11 @@ class ExperimentResultsResponse(FrozenModel):
     candidates: tuple[CandidateSpec, ...] = ()
     observations: tuple[BenchmarkObservation, ...] = ()
     best_candidate_id: Identifier | None = None
+    validated_winner_candidate_id: Identifier | None = None
+    finalization: FinalizationResult
     simulated: bool = False
     warnings: tuple[str, ...] = ()
-    phase: str = "phase-1-screening"
+    phase: str = "phase-5-finalization"
 
 
 class WorkerRegistrationRequest(FrozenModel):

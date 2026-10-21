@@ -205,6 +205,54 @@ def paired_log_ratio_ci(
         candidate_value / baseline_value
         for baseline_value, candidate_value in zip(baseline, candidate, strict=True)
     ]
+    return paired_ratio_ci(
+        ratios,
+        confidence_level=confidence_level,
+        resamples=resamples,
+        seed=seed,
+    )
+
+
+def objective_ratio(
+    objective: Objective,
+    *,
+    baseline_prefill_tokens_per_sec: float,
+    baseline_decode_tokens_per_sec: float,
+    candidate_prefill_tokens_per_sec: float,
+    candidate_decode_tokens_per_sec: float,
+) -> float:
+    """One paired objective ratio using the same formula as the PRD score."""
+    values = (
+        baseline_prefill_tokens_per_sec,
+        baseline_decode_tokens_per_sec,
+        candidate_prefill_tokens_per_sec,
+        candidate_decode_tokens_per_sec,
+    )
+    if any(not math.isfinite(value) or value <= 0 for value in values):
+        raise ScoreError("paired objective ratios require finite positive measurements")
+    prefill_ratio = candidate_prefill_tokens_per_sec / baseline_prefill_tokens_per_sec
+    decode_ratio = candidate_decode_tokens_per_sec / baseline_decode_tokens_per_sec
+    if objective is Objective.BALANCED:
+        return math.sqrt(prefill_ratio * decode_ratio)
+    if objective is Objective.DECODE_MAX:
+        return decode_ratio
+    if objective is Objective.PREFILL_MAX:
+        return prefill_ratio
+    raise ScoreError(f"unsupported objective: {objective!r}")
+
+
+def paired_ratio_ci(
+    ratios: Sequence[float],
+    *,
+    confidence_level: float = 0.95,
+    resamples: int = 2000,
+    seed: int = 20261020,
+) -> ConfidenceInterval:
+    """Deterministic percentile bootstrap over paired objective ratios."""
+    if len(ratios) < 2:
+        raise ScoreError("paired bootstrap requires at least two ratios")
+    if any(value <= 0 or not math.isfinite(value) for value in ratios):
+        raise ScoreError("paired ratios must be finite and positive")
     point = geometric_mean(ratios)
     rng = random.Random(seed)
     count = len(ratios)

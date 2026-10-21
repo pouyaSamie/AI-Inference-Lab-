@@ -18,6 +18,7 @@ from lab_core.ids import sha256_hex
 from lab_core import (
     BenchmarkObservation,
     BenchMetrics,
+    BenchSample,
     CancelPayload,
     CancelResult,
     CandidateSpec,
@@ -60,6 +61,7 @@ from lab_core import (
 from .bench import (
     CHARACTER_FALLBACK,
     ServingSuite,
+    derive_serving_metrics,
     derive_suite_metrics,
     effective_context,
     run_serving_suite,
@@ -766,6 +768,8 @@ class RealExecutor:
         quality: list[QualityGate] = []
         telemetry = TelemetryCoverage(source="nvidia-smi+psutil", coverage=0.0)
         telemetry_summary = TelemetrySummary()
+        samples: tuple[BenchSample, ...] = ()
+        repetitions = 1
 
         if native_run is not None:
             raw.extend(native_run.artifacts)
@@ -869,6 +873,29 @@ class RealExecutor:
                         "decode_tokens_per_sec": derived["decode_tokens_per_sec"],
                     }
                 )
+                retained: list[BenchSample] = []
+                for run in primary_runs:
+                    sample = derive_serving_metrics(run)
+                    sample_prefill = sample["prefill_tokens_per_sec"]
+                    sample_decode = sample["decode_tokens_per_sec"]
+                    if not isinstance(sample_prefill, (int, float)) or not isinstance(
+                        sample_decode, (int, float)
+                    ):
+                        continue
+                    if sample_prefill <= 0 or sample_decode <= 0:
+                        continue
+                    ttft = sample["time_to_first_token_ms"]
+                    total = sample["total_latency_ms"]
+                    retained.append(
+                        BenchSample(
+                            prefill_tokens_per_sec=float(sample_prefill),
+                            decode_tokens_per_sec=float(sample_decode),
+                            time_to_first_token_ms=(float(ttft) if isinstance(ttft, (int, float)) else None),
+                            total_latency_ms=(float(total) if isinstance(total, (int, float)) else None),
+                        )
+                    )
+                samples = tuple(retained)
+                repetitions = max(1, len(primary_runs))
                 primary = primary_runs[0]
                 effective = primary.effective_context or effective
                 input_tokens = derived["prompt_tokens"]
@@ -1156,7 +1183,8 @@ class RealExecutor:
             effective_context=effective,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            repetitions=1,
+            repetitions=repetitions,
+            samples=samples,
             telemetry=telemetry,
             quality_gates=tuple(quality),
             failure=failure,

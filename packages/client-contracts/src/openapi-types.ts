@@ -11,6 +11,7 @@ export interface components {
     };
     "AskPayload": {
       "attempt_limit"?: components["schemas"]["PositiveInt"];
+      "baseline"?: boolean;
       "context_tokens": components["schemas"]["PositiveInt"];
       "kind"?: "ASK";
       "study_id": components["schemas"]["Identifier"];
@@ -48,6 +49,12 @@ export interface components {
         [key: string]: string;
       };
     };
+    "BenchSample": {
+      "decode_tokens_per_sec": number;
+      "prefill_tokens_per_sec": number;
+      "time_to_first_token_ms"?: number | null;
+      "total_latency_ms"?: number | null;
+    };
     "BenchmarkObservation": {
       "attempt"?: components["schemas"]["NonNegativeInt"];
       "candidate_id": components["schemas"]["Identifier"];
@@ -74,6 +81,7 @@ export interface components {
       "quality_gates"?: components["schemas"]["QualityGate"][];
       "raw_evidence"?: components["schemas"]["RawEvidenceRef"][];
       "repetitions"?: components["schemas"]["PositiveInt"];
+      "samples"?: components["schemas"]["BenchSample"][];
       "schema_version"?: components["schemas"]["NonEmptyStr"];
       "simulated"?: boolean;
       "status": components["schemas"]["ObservationStatus"];
@@ -97,6 +105,7 @@ export interface components {
       "message"?: string | null;
       "terminated_owned_pids"?: number[];
     };
+    "CandidateRole": "baseline" | "candidate";
     "CandidateSpec": {
       "candidate_id"?: components["schemas"]["Identifier"];
       "context": components["schemas"]["ContextLength"];
@@ -107,6 +116,7 @@ export interface components {
       "notes"?: string[];
       "parameter_digest"?: components["schemas"]["Sha256"] | null;
       "parameters"?: components["schemas"]["Parameters"];
+      "role"?: components["schemas"]["CandidateRole"];
       "schema_version"?: components["schemas"]["NonEmptyStr"];
       "state"?: components["schemas"]["CandidateState"];
       "study_id": components["schemas"]["Identifier"];
@@ -152,6 +162,7 @@ export interface components {
       "workload"?: components["schemas"]["WorkloadSuite"] | null;
       "workload_digest": components["schemas"]["Sha256"];
     };
+    "Classification": "VALIDATED_WINNER" | "NO_VALIDATED_WINNER" | "SIMULATED";
     "CommandAck": {
       "disposition": components["schemas"]["AckDisposition"];
       "lease_generation": components["schemas"]["PositiveInt"];
@@ -183,6 +194,31 @@ export interface components {
       "status": string;
     };
     "ConditionOperator": "eq" | "neq" | "in" | "not_in" | "gte" | "lte";
+    "ConfidenceInterval": {
+      "confidence_level": components["schemas"]["Probability"];
+      "lower": number;
+      "method"?: components["schemas"]["NonEmptyStr"];
+      "point_estimate": number;
+      "resamples": number;
+      "sample_count": number;
+      "upper": number;
+    };
+    "ContextEvaluation": {
+      "baseline_candidate_id"?: components["schemas"]["Identifier"] | null;
+      "baseline_observation_id"?: components["schemas"]["Identifier"] | null;
+      "baseline_samples"?: components["schemas"]["NonNegativeInt"];
+      "candidate_id": components["schemas"]["Identifier"];
+      "candidate_samples"?: components["schemas"]["NonNegativeInt"];
+      "context": components["schemas"]["ContextLength"];
+      "improvement_pct"?: number | null;
+      "interval"?: components["schemas"]["ConfidenceInterval"] | null;
+      "observation_id"?: components["schemas"]["Identifier"] | null;
+      "qualified"?: boolean;
+      "reasons"?: string[];
+      "score"?: number | null;
+      "simulated"?: boolean;
+      "status"?: components["schemas"]["FinalizationStatus"];
+    };
     "ContextFeasibility": {
       "context": components["schemas"]["ContextLength"];
       "estimated_vram_bytes"?: number | null;
@@ -192,6 +228,12 @@ export interface components {
       "status"?: components["schemas"]["FeasibilityOutcome"];
     };
     "ContextLength": 4096 | 8192 | 16384 | 32768 | 65536 | 131072;
+    "ContextRanking": {
+      "baseline_candidate_id"?: components["schemas"]["Identifier"] | null;
+      "context": components["schemas"]["ContextLength"];
+      "evaluations"?: components["schemas"]["ContextEvaluation"][];
+      "winner_candidate_id"?: components["schemas"]["Identifier"] | null;
+    };
     "CreateExperimentRequest": {
       "notes"?: string[];
       "plan": components["schemas"]["ExperimentPlan"];
@@ -206,6 +248,15 @@ export interface components {
       "seed"?: components["schemas"]["NonNegativeInt"];
       "study_id": components["schemas"]["Identifier"];
       "study_name": components["schemas"]["NonEmptyStr"];
+    };
+    "CrossContextRanking": {
+      "candidate_id": components["schemas"]["Identifier"];
+      "complete_coverage": boolean;
+      "contexts"?: number[];
+      "per_context_scores"?: number[];
+      "qualified": boolean;
+      "reasons"?: string[];
+      "score": number;
     };
     "DimensionKind": "int" | "float" | "categorical" | "bool";
     "EngineCapabilityManifest": {
@@ -259,10 +310,12 @@ export interface components {
       "best_candidate_id"?: components["schemas"]["Identifier"] | null;
       "candidates"?: components["schemas"]["CandidateSpec"][];
       "experiment_id": components["schemas"]["Identifier"];
+      "finalization": components["schemas"]["FinalizationResult"];
       "observations"?: components["schemas"]["BenchmarkObservation"][];
       "phase"?: string;
       "simulated"?: boolean;
       "status": components["schemas"]["ExperimentStatusView"];
+      "validated_winner_candidate_id"?: components["schemas"]["Identifier"] | null;
       "warnings"?: string[];
     };
     "ExperimentSpec": {
@@ -323,6 +376,20 @@ export interface components {
     };
     "FailureKind": "UNSUPPORTED_FLAG" | "UNSUPPORTED_MODEL" | "INSUFFICIENT_VRAM" | "INSUFFICIENT_RAM" | "OOM" | "SERVER_NOT_READY" | "MODEL_LOAD_FAILURE" | "PROCESS_CRASH" | "TIMEOUT" | "INVALID_METRICS" | "CONTEXT_MISMATCH" | "QUALITY_REGRESSION" | "THERMAL_CONTAMINATION" | "EXTERNAL_GPU_CONTENTION" | "CANCELLED" | "LEASE_CONFLICT" | "SIMULATION_ERROR" | "UNKNOWN";
     "FeasibilityOutcome": "feasible" | "resource_infeasible" | "unsupported" | "inconclusive" | "unknown";
+    "FinalizationResult": {
+      "classification": components["schemas"]["Classification"];
+      "confidence_level"?: number;
+      "cross_context"?: components["schemas"]["CrossContextRanking"][];
+      "experiment_id": components["schemas"]["Identifier"];
+      "objective": components["schemas"]["Objective"];
+      "per_context"?: components["schemas"]["ContextRanking"][];
+      "recipe_mode": components["schemas"]["RecipeMode"];
+      "simulated"?: boolean;
+      "threshold_pct"?: number;
+      "validated_winner_candidate_id"?: components["schemas"]["Identifier"] | null;
+      "warnings"?: string[];
+    };
+    "FinalizationStatus": "validated" | "inconclusive" | "ineligible";
     "GPUDevice": {
       "compute_capability"?: string | null;
       "driver_version"?: string | null;

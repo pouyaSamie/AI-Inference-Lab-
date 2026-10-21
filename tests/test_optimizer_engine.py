@@ -78,3 +78,42 @@ def test_create_ask_tell_replay_and_reconcile(tmp_path: Path) -> None:
     assert reconcile.completed_trials == 1
     assert reconcile.pending_trials == ()
     assert engine.health()["studies"] == 1
+
+
+def test_baseline_ask_uses_documented_defaults(tmp_path: Path) -> None:
+    engine = OptunaEngine(f"sqlite:///{tmp_path / 'baseline.sqlite3'}")
+    search_space = SearchSpaceSpec(
+        engine_id=EngineId.LLAMACPP,
+        dimensions=(
+            *_space().dimensions,
+            ParameterDimension(
+                name="context_tokens",
+                kind=DimensionKind.CATEGORICAL,
+                choices=(4096, 8192),
+            ),
+        ),
+        fixed_parameters={"gpu_layers": -1},
+    )
+    engine.create_study(
+        CreateStudyPayload(
+            study_id="study-baseline",
+            study_name="study-baseline",
+            experiment_id="exp-baseline",
+            max_trials=2,
+            search_space=search_space,
+            objective=Objective.BALANCED,
+        )
+    )
+    baseline = engine.ask(
+        AskPayload(
+            study_id="study-baseline",
+            study_name="study-baseline",
+            context_tokens=8192,
+            workload_digest="0" * 64,
+            baseline=True,
+        )
+    )
+    assert baseline.parameters["gpu_layers"] == -1
+    assert baseline.parameters["threads"] == 1
+    assert baseline.parameters["flash_attn"] == "on"
+    assert baseline.parameters["context_tokens"] == 8192

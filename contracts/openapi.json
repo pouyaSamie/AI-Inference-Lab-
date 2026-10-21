@@ -38,6 +38,11 @@
             "$ref": "#/components/schemas/PositiveInt",
             "default": 32
           },
+          "baseline": {
+            "default": false,
+            "title": "Baseline",
+            "type": "boolean"
+          },
           "context_tokens": {
             "$ref": "#/components/schemas/PositiveInt"
           },
@@ -321,6 +326,48 @@
         "title": "BenchMetrics",
         "type": "object"
       },
+      "BenchSample": {
+        "additionalProperties": false,
+        "description": "One primary-level repeat retained for paired bootstrap confidence.\n\nThe observation's ``metrics`` remain the robust summary shown to operators.\nThese samples are the raw comparable repeats used by finalization; they are\nnever merged across prompt loads.",
+        "properties": {
+          "decode_tokens_per_sec": {
+            "title": "Decode Tokens Per Sec",
+            "type": "number"
+          },
+          "prefill_tokens_per_sec": {
+            "title": "Prefill Tokens Per Sec",
+            "type": "number"
+          },
+          "time_to_first_token_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To First Token Ms"
+          },
+          "total_latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Latency Ms"
+          }
+        },
+        "required": [
+          "prefill_tokens_per_sec",
+          "decode_tokens_per_sec"
+        ],
+        "title": "BenchSample",
+        "type": "object"
+      },
       "BenchmarkObservation": {
         "additionalProperties": false,
         "description": "Immutable normalized evidence for one candidate/context/attempt.\n\n``observation_id`` is deterministic over candidate, attempt, evidence\nlane and context. The controller uses it as the idempotency key for\nduplicate worker completions.",
@@ -456,6 +503,14 @@
             "$ref": "#/components/schemas/PositiveInt",
             "default": 1
           },
+          "samples": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BenchSample"
+            },
+            "title": "Samples",
+            "type": "array"
+          },
           "schema_version": {
             "$ref": "#/components/schemas/NonEmptyStr",
             "default": "1.0.0"
@@ -584,6 +639,14 @@
         "title": "CancelResult",
         "type": "object"
       },
+      "CandidateRole": {
+        "enum": [
+          "baseline",
+          "candidate"
+        ],
+        "title": "CandidateRole",
+        "type": "string"
+      },
       "CandidateSpec": {
         "additionalProperties": false,
         "description": "A concrete, reproducible parameter vector for one trial and context.\n\n``candidate_id`` is deterministic over engine hash, model digest, worker,\ncontext, workload digest and parameters, which makes duplicate proposals\ndetectable across controller and optimizer restarts.",
@@ -627,6 +690,10 @@
           },
           "parameters": {
             "$ref": "#/components/schemas/Parameters"
+          },
+          "role": {
+            "$ref": "#/components/schemas/CandidateRole",
+            "default": "candidate"
           },
           "schema_version": {
             "$ref": "#/components/schemas/NonEmptyStr",
@@ -888,6 +955,15 @@
         "title": "ClaimTrialPayload",
         "type": "object"
       },
+      "Classification": {
+        "enum": [
+          "VALIDATED_WINNER",
+          "NO_VALIDATED_WINNER",
+          "SIMULATED"
+        ],
+        "title": "Classification",
+        "type": "string"
+      },
       "CommandAck": {
         "additionalProperties": false,
         "properties": {
@@ -1103,6 +1179,157 @@
         "title": "ConditionOperator",
         "type": "string"
       },
+      "ConfidenceInterval": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence_level": {
+            "$ref": "#/components/schemas/Probability"
+          },
+          "lower": {
+            "title": "Lower",
+            "type": "number"
+          },
+          "method": {
+            "$ref": "#/components/schemas/NonEmptyStr",
+            "default": "paired_log_ratio_bootstrap_percentile"
+          },
+          "point_estimate": {
+            "title": "Point Estimate",
+            "type": "number"
+          },
+          "resamples": {
+            "title": "Resamples",
+            "type": "integer"
+          },
+          "sample_count": {
+            "title": "Sample Count",
+            "type": "integer"
+          },
+          "upper": {
+            "title": "Upper",
+            "type": "number"
+          }
+        },
+        "required": [
+          "confidence_level",
+          "lower",
+          "upper",
+          "point_estimate",
+          "resamples",
+          "sample_count"
+        ],
+        "title": "ConfidenceInterval",
+        "type": "object"
+      },
+      "ContextEvaluation": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_candidate_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseline_observation_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseline_samples": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "candidate_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "candidate_samples": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
+          },
+          "context": {
+            "$ref": "#/components/schemas/ContextLength"
+          },
+          "improvement_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Improvement Pct"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfidenceInterval"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observation_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qualified": {
+            "default": false,
+            "title": "Qualified",
+            "type": "boolean"
+          },
+          "reasons": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "simulated": {
+            "default": false,
+            "title": "Simulated",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FinalizationStatus",
+            "default": "ineligible"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "context"
+        ],
+        "title": "ContextEvaluation",
+        "type": "object"
+      },
       "ContextFeasibility": {
         "additionalProperties": false,
         "properties": {
@@ -1166,6 +1393,47 @@
         ],
         "title": "ContextLength",
         "type": "integer"
+      },
+      "ContextRanking": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_candidate_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "context": {
+            "$ref": "#/components/schemas/ContextLength"
+          },
+          "evaluations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ContextEvaluation"
+            },
+            "title": "Evaluations",
+            "type": "array"
+          },
+          "winner_candidate_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "context"
+        ],
+        "title": "ContextRanking",
+        "type": "object"
       },
       "CreateExperimentRequest": {
         "additionalProperties": false,
@@ -1238,6 +1506,58 @@
           "objective"
         ],
         "title": "CreateStudyPayload",
+        "type": "object"
+      },
+      "CrossContextRanking": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "complete_coverage": {
+            "title": "Complete Coverage",
+            "type": "boolean"
+          },
+          "contexts": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Contexts",
+            "type": "array"
+          },
+          "per_context_scores": {
+            "default": [],
+            "items": {
+              "type": "number"
+            },
+            "title": "Per Context Scores",
+            "type": "array"
+          },
+          "qualified": {
+            "title": "Qualified",
+            "type": "boolean"
+          },
+          "reasons": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "score",
+          "complete_coverage",
+          "qualified"
+        ],
+        "title": "CrossContextRanking",
         "type": "object"
       },
       "DimensionKind": {
@@ -1570,6 +1890,9 @@
           "experiment_id": {
             "$ref": "#/components/schemas/Identifier"
           },
+          "finalization": {
+            "$ref": "#/components/schemas/FinalizationResult"
+          },
           "observations": {
             "default": [],
             "items": {
@@ -1579,7 +1902,7 @@
             "type": "array"
           },
           "phase": {
-            "default": "phase-1-screening",
+            "default": "phase-5-finalization",
             "title": "Phase",
             "type": "string"
           },
@@ -1590,6 +1913,16 @@
           },
           "status": {
             "$ref": "#/components/schemas/ExperimentStatusView"
+          },
+          "validated_winner_candidate_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "warnings": {
             "default": [],
@@ -1602,7 +1935,8 @@
         },
         "required": [
           "experiment_id",
-          "status"
+          "status",
+          "finalization"
         ],
         "title": "ExperimentResultsResponse",
         "type": "object"
@@ -1936,6 +2270,89 @@
           "unknown"
         ],
         "title": "FeasibilityOutcome",
+        "type": "string"
+      },
+      "FinalizationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "$ref": "#/components/schemas/Classification"
+          },
+          "confidence_level": {
+            "default": 0.95,
+            "title": "Confidence Level",
+            "type": "number"
+          },
+          "cross_context": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CrossContextRanking"
+            },
+            "title": "Cross Context",
+            "type": "array"
+          },
+          "experiment_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/Objective"
+          },
+          "per_context": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ContextRanking"
+            },
+            "title": "Per Context",
+            "type": "array"
+          },
+          "recipe_mode": {
+            "$ref": "#/components/schemas/RecipeMode"
+          },
+          "simulated": {
+            "default": false,
+            "title": "Simulated",
+            "type": "boolean"
+          },
+          "threshold_pct": {
+            "default": 5.0,
+            "title": "Threshold Pct",
+            "type": "number"
+          },
+          "validated_winner_candidate_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "experiment_id",
+          "objective",
+          "recipe_mode",
+          "classification"
+        ],
+        "title": "FinalizationResult",
+        "type": "object"
+      },
+      "FinalizationStatus": {
+        "enum": [
+          "validated",
+          "inconclusive",
+          "ineligible"
+        ],
+        "title": "FinalizationStatus",
         "type": "string"
       },
       "GPUDevice": {

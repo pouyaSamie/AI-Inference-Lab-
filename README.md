@@ -1,8 +1,9 @@
 # AI Inference Optimization Lab
 
-Phase 4 foundation for a local-first inference optimization controller,
+Phase 5 foundation for a local-first inference optimization controller,
 supervised Optuna process, durable Linux worker protocol, conformance-tested
-llama.cpp/Strata adapters and tokenizer-backed benchmark workloads.
+llama.cpp/Strata adapters, tokenizer-backed benchmark workloads and paired
+statistical finalization.
 
 > **The execution lanes are separate.** `lab-worker-sim` produces deterministic
 > simulated observations marked `simulated=true`; those can never qualify a
@@ -10,7 +11,11 @@ llama.cpp/Strata adapters and tokenizer-backed benchmark workloads.
 > engines and models, launches argv-only subprocesses, leases GPU UUIDs and
 > records measured evidence. Missing evidence stays missing. Prompts are fitted
 > with the target engine tokenizer when available; a character-estimated prompt
-> is labelled `screening_only`.
+> is labelled `screening_only`. Finalization compares retained candidate
+> samples with a fixed-default baseline at the same context using a deterministic
+> paired bootstrap. Results are classified `VALIDATED_WINNER`,
+> `NO_VALIDATED_WINNER` or `SIMULATED`; only eligible measured evidence can
+> produce a validated recipe.
 
 The authoritative specification is [`docs/prd.md`](docs/prd.md). Architecture
 and decisions are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
@@ -93,7 +98,8 @@ digests match.
 
 The installed Strata `0.1.44.1` build exposes no `models list`, `doctor`,
 `engine calibrate` or `bench run` command. Those forms are refused rather than
-synthesized; full-context proof remains `INCONCLUSIVE` until Phase 4.
+synthesized; full-context proof remains `INCONCLUSIVE` until a real approved
+serving run.
 
 ## Repository map
 

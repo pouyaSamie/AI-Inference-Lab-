@@ -109,11 +109,35 @@ class OptunaEngine:
         except KeyError as exc:
             raise OptimizerEngineError(f"Optuna study {study_name!r} does not exist") from exc
 
+    def _defaults(self, search_space: SearchSpaceSpec) -> dict[str, Any]:
+        """Return the adapter's documented defaults for a paired baseline."""
+        parameters: dict[str, Any] = {}
+        for name, value in search_space.fixed_parameters.items():
+            parameters[name] = _json_scalar(value)
+        for dimension in search_space.dimensions:
+            if not search_space.is_active(dimension, parameters):
+                continue
+            default = dimension.default
+            if default is None and dimension.choices:
+                default = dimension.choices[0]
+            if default is None and dimension.minimum is not None:
+                default = dimension.minimum
+            if default is None:
+                raise OptimizerEngineError(
+                    f"cannot build a baseline: dimension {dimension.name!r} has no default"
+                )
+            parameters[dimension.name] = _json_scalar(default)
+        return parameters
+
     def _suggest(
         self,
         trial: optuna.Trial,
         search_space: SearchSpaceSpec,
+        *,
+        baseline: bool = False,
     ) -> dict[str, Any]:
+        if baseline:
+            return self._defaults(search_space)
         parameters: dict[str, Any] = {}
         for name, value in search_space.fixed_parameters.items():
             parameters[name] = _json_scalar(value)
@@ -153,7 +177,13 @@ class OptunaEngine:
         search_space = SearchSpaceSpec.model_validate(study.user_attrs.get("search_space"))
         trial = study.ask()
         try:
-            parameters = self._suggest(trial, search_space)
+            parameters = self._suggest(trial, search_space, baseline=payload.baseline)
+            if payload.baseline and any(
+                dimension.name == "context_tokens" for dimension in search_space.dimensions
+            ):
+                # A baseline is a same-context control; never let a default
+                # fallback move it to another context in the search space.
+                parameters["context_tokens"] = int(payload.context_tokens)
         except Exception as exc:
             study.tell(trial.number, state=optuna.trial.TrialState.FAIL)
             raise OptimizerEngineError(f"failed to suggest parameters: {exc}") from exc

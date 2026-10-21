@@ -12,11 +12,16 @@ from lab_adapters import registry as adapter_registry
 from lab_core import (
     BenchmarkObservation,
     BinaryKind,
+    CandidateRole,
     CandidateSpec,
     ExperimentSpec,
+    FinalizationStatus,
     MeasurementStatus,
     ObservationStatus,
+    RecipeMode,
+    RecipeStatus,
     RegisteredBinary,
+    finalize_experiment,
 )
 
 from ..config import Settings
@@ -62,6 +67,74 @@ def create_recipe(session: Session, settings: Settings, experiment_id: str, cand
             details={"reasons": sorted(set(eligibility))},
         )
     spec = ExperimentSpec.model_validate(experiment.spec_json)
+    candidate = CandidateSpec.model_validate(candidate_row.payload_json)
+    if candidate.role is CandidateRole.BASELINE:
+        raise ConflictError(
+            "the paired baseline is a reference, not an optimized deployment recipe",
+            details={"candidate_id": candidate_id, "reason": "BASELINE_REFERENCE"},
+        )
+    candidate_rows = session.scalars(
+        select(CandidateRow).where(CandidateRow.experiment_id == experiment_id)
+    ).all()
+    all_observation_rows = session.scalars(
+        select(ObservationRow).where(ObservationRow.experiment_id == experiment_id)
+    ).all()
+    finalization = finalize_experiment(
+        experiment_id=experiment_id,
+        spec=spec,
+        candidates=tuple(CandidateSpec.model_validate(row.payload_json) for row in candidate_rows),
+        observations=tuple(
+            BenchmarkObservation.model_validate(row.payload_json) for row in all_observation_rows
+        ),
+    )
+    if finalization.simulated:
+        raise ConflictError(
+            "simulated evidence cannot produce a validated deployment recipe",
+            details={"candidate_id": candidate_id, "reason": "SIMULATED_EVIDENCE"},
+        )
+    evaluation = next(
+        (
+            item
+            for ranking in finalization.per_context
+            if int(ranking.context) == int(candidate.context)
+            for item in ranking.evaluations
+            if item.candidate_id == candidate_id
+        ),
+        None,
+    )
+    if spec.recipe_mode is RecipeMode.CROSS_CONTEXT:
+        cross = next(
+            (item for item in finalization.cross_context if item.candidate_id == candidate_id),
+            None,
+        )
+        if cross is None or not cross.qualified:
+            raise ConflictError(
+                "candidate has not passed cross-context qualification",
+                details={
+                    "candidate_id": candidate_id,
+                    "reasons": list(cross.reasons) if cross else ["NO_CROSS_CONTEXT_EVALUATION"],
+                    "classification": finalization.classification.value,
+                },
+            )
+    elif (
+        evaluation is None
+        or not evaluation.qualified
+        or evaluation.status is not FinalizationStatus.VALIDATED
+    ):
+        raise ConflictError(
+            "candidate has not passed the pre-declared qualification gate",
+            details={
+                "candidate_id": candidate_id,
+                "classification": finalization.classification.value,
+                "reasons": list(evaluation.reasons) if evaluation else ["NO_CONTEXT_EVALUATION"],
+                "score": evaluation.score if evaluation else None,
+                "interval": (
+                    evaluation.interval.model_dump(mode="json")
+                    if evaluation and evaluation.interval
+                    else None
+                ),
+            },
+        )
     snapshot_row = latest_snapshot(session, experiment.worker_id)
     if snapshot_row is None:
         raise ConflictError("no worker snapshot is available for recipe construction")
@@ -88,7 +161,7 @@ def create_recipe(session: Session, settings: Settings, experiment_id: str, cand
     adapter = adapter_registry().get(spec.engine.engine_id)
     if not hasattr(adapter, "build_deployment_recipe"):
         raise UnsupportedCapabilityError("adapter does not implement deployment recipes")
-    candidate = CandidateSpec.model_validate(candidate_row.payload_json)
+    qualification_ref = f"experiments/{experiment_id}/candidates/{candidate_id}/qualification.json"
     evidence = ValidatedEvidence(
         validated=True,
         experiment_id=experiment_id,
@@ -96,8 +169,12 @@ def create_recipe(session: Session, settings: Settings, experiment_id: str, cand
         candidate_id=candidate_id,
         observations=observations,
         quality_gates=tuple(gate for item in observations for gate in item.quality_gates),
+        confidence_ref=qualification_ref,
         metrics_ref=f"experiments/{experiment_id}/candidates/{candidate_id}/metrics.json",
-        notes=("Controller-validated measured evidence.",),
+        notes=(
+            "Controller-validated measured evidence.",
+            "Paired baseline qualification passed at the declared confidence threshold.",
+        ),
     )
     recipe = adapter.build_deployment_recipe(
         candidate,
@@ -105,6 +182,18 @@ def create_recipe(session: Session, settings: Settings, experiment_id: str, cand
         binary=binary,
         model=model,
         hardware=snapshot.hardware,
+    )
+    qualification_note = "Qualification gate passed for this candidate and context."
+    if evaluation is not None and evaluation.interval is not None:
+        qualification_note = (
+            f"Objective ratio {evaluation.score:.4f}; 95% paired interval "
+            f"[{evaluation.interval.lower:.4f}, {evaluation.interval.upper:.4f}]."
+        )
+    recipe = recipe.model_copy(
+        update={
+            "status": RecipeStatus.VALIDATED,
+            "notes": (*recipe.notes, qualification_note),
+        }
     )
     existing = session.get(RecipeRow, recipe.id)
     if existing is not None:

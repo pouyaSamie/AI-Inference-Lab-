@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from lab_core import (
     AskPayload,
     AskResult,
+    CandidateRole,
     CandidateSpec,
     CandidateState,
     ClaimTrialPayload,
@@ -392,6 +393,7 @@ def _apply_ask_result(
         model_digest=spec.model.artifact_digest,
         worker_id=spec.worker_id,
         context=context,
+        role=CandidateRole.BASELINE if request.payload.baseline else CandidateRole.CANDIDATE,
         parameters=params,
         workload_digest=spec.workload.digest(),
     )
@@ -458,6 +460,12 @@ def _apply_ask_result(
     session.add(candidate_row)
     study.proposal_attempts += 1
     session.flush()
+    if JobState(experiment.state) is JobState.RUNNING:
+        set_stage(
+            session,
+            experiment,
+            JobStage.BASELINE if request.payload.baseline else JobStage.SCREENING,
+        )
     append_event(
         session,
         experiment.experiment_id,
@@ -606,7 +614,10 @@ def _maybe_complete(session: Session, study: StudyRow, experiment: ExperimentRow
             payload={
                 "study_id": study.study_id,
                 "candidates": int(total),
-                "phase_1_note": "Phase 1 screening only; no validated deployment recipe is claimed.",
+                "phase_5_note": (
+                    "Statistical finalization is available; only real measured evidence "
+                    "that passes the paired qualification gate can produce a recipe."
+                ),
             },
         )
     elif study.proposal_attempts >= study.maximum_trials * 8:
@@ -728,7 +739,16 @@ def reconcile_study(session: Session, settings: Settings, study: StudyRow) -> No
     )
     if pending_action is None and in_flight is None and total < study.maximum_trials:
         spec = ExperimentSpec.model_validate(experiment.spec_json)
-        context = spec.contexts[total % len(spec.contexts)]
+        candidate_rows = session.scalars(
+            select(CandidateRow).where(CandidateRow.study_id == study.study_id)
+        ).all()
+        baseline_contexts: set[int] = set()
+        for row in candidate_rows:
+            prior = CandidateSpec.model_validate(row.payload_json)
+            if prior.role is CandidateRole.BASELINE:
+                baseline_contexts.add(int(prior.context))
+        missing_baseline = [context for context in spec.contexts if int(context) not in baseline_contexts]
+        context = missing_baseline[0] if missing_baseline else spec.contexts[total % len(spec.contexts)]
         enqueue_optimizer_request(
             session,
             kind=OptimizerRequestKind.ASK,
@@ -738,6 +758,7 @@ def reconcile_study(session: Session, settings: Settings, study: StudyRow) -> No
                 study_name=study.study_name,
                 context_tokens=int(context),
                 workload_digest=spec.workload.digest(),
+                baseline=bool(missing_baseline),
             ),
             idempotency_key=f"ask:{study.study_id}:{new_id('req')}",
         )
