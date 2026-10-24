@@ -1,0 +1,29 @@
+{
+  "version": "0.6.2",
+  "architecture": "amd64",
+  "bytes": 145213254,
+  "sha256": "851fd937a59014461ec9d68f8eb2b02288e012dc200916dab3180c6274e82f34",
+  "payload_files_verified": 6862,
+  "installed": false,
+  "cleanup_removed": [
+    "/tmp/lab-062-verify-pmgi05q1",
+    "/tmp/lab-packaged-smoke-HW4QbK",
+    "/tmp/lab-packaged-smoke-z5AGfN",
+    "/tmp/lab-journey-qa-U4QSnv",
+    "/home/pouya/workspace/workspace/AI/Apps/Infrence-bench/apps/desktop/release/linux-deb"
+  ],
+  "stash_retained": true,
+  "verification": {
+    "python_tests": 142,
+    "desktop_tests": 111,
+    "bundled_runtime_tests": 11,
+    "electron_screenshots": 32,
+    "packaged_sandbox": true
+  },
+  "limits": [
+    "No clean-target installation/upgrade acceptance",
+    "Maintenance screenshots use explicit UI fixtures",
+    "No matched manual/app performance comparison or speed fix",
+    "No actual native reset or engine installation performed"
+  ]
+}

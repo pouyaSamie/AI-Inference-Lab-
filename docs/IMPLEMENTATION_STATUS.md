@@ -1389,3 +1389,10 @@ sibling SHA-256 file. This is a locally built and smoke-tested artifact, not a
 clean-target installation/upgrade acceptance. No actual native reset/Trash,
 new engine install/selection or matched manual-versus-app performance run was
 performed. Existing deferred phase gates and dependency-audit limitations remain.
+
+Final 0.6.2 package is **145,213,254 bytes**; SHA-256
+`851fd937a59014461ec9d68f8eb2b02288e012dc200916dab3180c6274e82f34`.
+Removed five owned temporary paths (extraction, staging and disposable UI/smoke
+profiles) only after checking for running processes. Retained installer/checksum,
+screenshot evidence, original stash and all operator data. Release manifest:
+`docs/evidence/journey-0.6.2/release.json`.
