@@ -64,6 +64,7 @@ htmlcov/
 coverage.xml
 *.cover
 .hypothesis/
+coverage/
 
 # ==========================================
 # 4. Databases & Local Storage (v2.1 Dual SQLite WAL)
@@ -105,6 +106,16 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+.vite/
+.vitest/
+*.cpuprofile
+*.heapprofile
+*.heapsnapshot
+
+# Disposable desktop profiles and recoverable reset data (never source).
+/apps/desktop/.user-data/
+/apps/desktop/.electron-user-data/
+/apps/desktop/reset-recovery-*/
 
 # ==========================================
 # 6. AI Models, Engines & Benchmark Artifacts
@@ -130,3 +141,7 @@ mixed-results/
 !fixtures/**
 !contracts/openapi.yaml
 !contracts/schemas/**
+
+# Renderer source code is not a Python library/build directory.
+!apps/desktop/src/lib/
+!apps/desktop/src/lib/**
