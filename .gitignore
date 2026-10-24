@@ -145,3 +145,6 @@ mixed-results/
 # Renderer source code is not a Python library/build directory.
 !apps/desktop/src/lib/
 !apps/desktop/src/lib/**
+
+# Design source tokens are not credentials.
+!/styles/design-tokens.css
