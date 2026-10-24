@@ -1,0 +1,189 @@
+{
+  "version": "0.6.2",
+  "lane": "Actual Electron; offline demo and update UI fixtures, no engine installation or benchmark",
+  "records": [
+    {
+      "name": "overview-dark-1024x768.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Overview"
+    },
+    {
+      "name": "updates-dark-1024x768.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Updates"
+    },
+    {
+      "name": "models-dark-1024x768.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Models"
+    },
+    {
+      "name": "live-dark-1024x768.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Live Runs"
+    },
+    {
+      "name": "overview-dark-1440x900.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Overview"
+    },
+    {
+      "name": "updates-dark-1440x900.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Updates"
+    },
+    {
+      "name": "models-dark-1440x900.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Models"
+    },
+    {
+      "name": "live-dark-1440x900.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Live Runs"
+    },
+    {
+      "name": "overview-dark-1920x1080.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Overview"
+    },
+    {
+      "name": "updates-dark-1920x1080.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Updates"
+    },
+    {
+      "name": "models-dark-1920x1080.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Models"
+    },
+    {
+      "name": "live-dark-1920x1080.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Live Runs"
+    },
+    {
+      "name": "overview-light-1024x768.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Overview"
+    },
+    {
+      "name": "updates-light-1024x768.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Updates"
+    },
+    {
+      "name": "models-light-1024x768.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Models"
+    },
+    {
+      "name": "live-light-1024x768.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Live Runs"
+    },
+    {
+      "name": "overview-light-1440x900.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Overview"
+    },
+    {
+      "name": "updates-light-1440x900.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Updates"
+    },
+    {
+      "name": "models-light-1440x900.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Models"
+    },
+    {
+      "name": "live-light-1440x900.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Live Runs"
+    },
+    {
+      "name": "overview-light-1920x1080.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Overview"
+    },
+    {
+      "name": "updates-light-1920x1080.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Updates"
+    },
+    {
+      "name": "models-light-1920x1080.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Models"
+    },
+    {
+      "name": "live-light-1920x1080.png",
+      "overflow": false,
+      "node": "undefined",
+      "title": "AI Inference Optimization Lab · Live Runs"
+    },
+    {
+      "name": "maintenance-downloading-dark.png",
+      "fixture": true
+    },
+    {
+      "name": "maintenance-unpacking-dark.png",
+      "fixture": true
+    },
+    {
+      "name": "maintenance-complete-dark.png",
+      "fixture": true
+    },
+    {
+      "name": "maintenance-failed-dark.png",
+      "fixture": true
+    },
+    {
+      "name": "maintenance-downloading-light.png",
+      "fixture": true
+    },
+    {
+      "name": "maintenance-unpacking-light.png",
+      "fixture": true
+    },
+    {
+      "name": "maintenance-complete-light.png",
+      "fixture": true
+    },
+    {
+      "name": "maintenance-failed-light.png",
+      "fixture": true
+    }
+  ],
+  "setup": {
+    "iconSize": {
+      "width": 256,
+      "height": 256
+    },
+    "classSwitch": "ai-inference-lab"
+  }
+}
