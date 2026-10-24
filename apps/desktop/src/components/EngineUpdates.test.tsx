@@ -94,6 +94,8 @@ it("shows verified installation completion and selects only the matching discove
   const view = await render(<EngineUpdatesPanel />);
   try {
     expect(view.container.textContent).toContain("llama.cpp 0.7.0 installed");
+    expect(view.container.textContent).toContain("Installed · select to use");
+    expect([...view.container.querySelectorAll("button")].find(b => b.textContent === "Build installed")?.disabled).toBe(true);
     await act(async () => { [...view.container.querySelectorAll("button")].find(b => b.textContent === "Use this engine")!.click(); });
     expect(useEngine).toHaveBeenCalledWith("matching");
   } finally { await view.close(); }
