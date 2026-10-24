@@ -70,6 +70,20 @@ manifests**) is **not met**. See `docs/progress/PHASE_8_REPORT.md`.
 | AC-43 | Verified offline | Offline contract export and `scripts/check_contracts.py` drift gate pass. |
 | AC-44 | Authored only | Systemd units are authored; no boot/logout/GPU-device-permission test. |
 
+## Desktop 0.2.0 increment
+
+The older desktop 0.1.0 package is observed installed on this machine. The new
+self-contained 0.2.0 package is a separate build and is not automatically
+installed. `tests/test_desktop_runtime.py` exercises the managed subprocess
+runtime, exclusive profile ownership, fresh schemas, pre-migration snapshots,
+unknown-schema refusal, private credentials, simulated completion/recipe
+rejection, controller crash recovery, session pepper rotation and parent-EOF
+shutdown. Its packaged mode uses the staged interpreter and dependencies,
+without service imports from the repository. Desktop tests cover native-path
+IPC selection, startup status and session keyring fallback. These extend offline
+evidence for AC-01/03/13/24/26/32/40; they do not close the existing target-host,
+real-GPU, full-GUI, install/uninstall or systemd/logout acceptance gates.
+
 ## Reproducible offline gates
 
 ```bash
@@ -88,3 +102,33 @@ systemd-analyze verify packaging/systemd/lab-*.service
 These gates do not close AC-01/02/03/14/15/18/19/23/26/27/28/29/30/31/33/37/38/39/40/42/44.
 Closing them requires the live acceptance and approval steps in
 `docs/RUNBOOK.md`.
+
+
+Desktop 0.3.0 incremental evidence: isolated packaged GUI verified visible startup,
+three-step setup, persisted completion after reload, read-only discovery (10
+models/six engine build locations), cached Models browsing and aligned overview
+columns. These checks used the available host/display, not a clean installation;
+no engine was selected or inference workload launched. See IMPLEMENTATION_STATUS
+section 12 for commands/results and remaining acceptance gates.
+
+
+Desktop 0.4.0 incremental evidence: real Electron exercised minimize, cancel, quit
+and cleanup after window destruction without the reported exception. Isolated
+packaged wizard smoke verified recommendation visibility and preserved model
+browsing. Official release metadata checks were read-only. New offline tests cover
+checks/preferences, stable-pointer resolution, backend/ID validation, side-by-side
+install staging, checksum mismatch, archive escape rejection, cancellation and
+protected removal. No real engine archive or installed desktop was upgraded by
+these checks. See IMPLEMENTATION_STATUS section 13 and ADR 0019.
+
+
+Desktop 0.5.0 incremental evidence (2026-10-22): 96 Python tests and 69 desktop
+tests pass; final bundled runtime integration has 8 passing tests. Packaged
+Electron smoke verifies visible startup, renderer isolation, saved wizard state,
+synthetic model discovery and first-import progress. Real Electron close lifecycle
+and synthetic engine installation (including CUDA runtime libraries) pass.
+The bundled read-only hardware helper observed the host RTX 3060 and driver;
+NVIDIA/AMD/Intel/Vulkan/CPU recommendation combinations are otherwise fixture
+coverage. Import verification, valid-cache reuse, cancellation, targeted scan
+compatibility and automatic readiness/failure UX are covered offline. This is a
+built package, not clean-host installation or real inference qualification.

@@ -300,3 +300,138 @@ L40S matrix. Until these are recorded, do not claim v1 acceptance.
   engine/model.
 - Controller and optimizer databases are different files.
 - No secret, model prompt, full environment dump or worker token is logged.
+
+## Self-contained desktop 0.5.0
+
+The new desktop package includes its own CPython 3.13.16 and locked Python
+packages. It does not require an independently started controller, optimizer,
+worker, repository, Node, uv or host Python at runtime. Start the application
+and follow the three-step wizard: add model/inference parent folders, choose a
+discovered build, then review and save. Supporting binaries, libraries, Strata
+scripts and nearby virtual environments are located together. Advanced path
+selectors support unusual layouts. Folder choices save automatically; wizard
+progress/completion survive reopening. Settings → Edit setup lets the operator
+add/remove folders, rescan and change builds when no jobs are active.
+
+Model inventory appears without an engine selected. Initial discovery reads
+metadata only, including split GGUF models and Strata packs; sidecars are excluded.
+Import automatically queues a durable SHA-256 verification scan. The progress bar
+shows bytes and files checked; large libraries may take several minutes. Cached
+hashes survive restarts and are reused only while file size and mtime match.
+Completed file hashes survive cancellation, but partial identities never qualify.
+Readiness waits for the queued command, reloads the snapshot and rechecks the plan
+automatically. On failure, read the concrete error, fix the missing/unreadable file
+or configuration and use Retry model verification or Re-check plan.
+A discovered build still needs capability/hardware checks before optimization.
+Discovery never downloads or changes engines/models. The separate desktop engine
+manager offers explicit, checksum-verified engine installation; models and drivers
+are never downloaded.
+
+Electron main starts a private runtime supervisor. It holds an exclusive local
+profile lock, checks/migrates the owned controller store, binds an ephemeral
+IPv4 loopback socket and supervises controller, optimizer and worker separately.
+The renderer receives status and validated IPC only. Runtime configuration ignores
+`.env`, Python hooks, proxy settings and inherited `LAB_*` development settings.
+
+Application-owned files are under Electron's `userData/local-lab` directory
+(normally `${XDG_CONFIG_HOME:-~/.config}/AI Inference Optimization Lab/local-lab`).
+The previous installed 0.1.0 app used a different package name in some builds;
+use the current application's actual userData path rather than moving files by
+hand. Existing external databases and engine/model roots are never imported.
+The profile contains controller/optimizer SQLite files, private configuration,
+worker enrollment/journals, artifacts, bounded lifecycle logs and pre-migration
+backups. Unknown controller revisions are refused. Optuna retains its storage
+compatibility check; no automatic optimizer schema upgrade is performed.
+
+Close asks Quit, Minimize to tray, or Cancel. Quit interrupts work and shuts services down
+in worker/optimizer/controller order. If the tray is unavailable, keep the
+window minimized to continue jobs. Services do not survive desktop logout in
+this mode. Do not run a separately managed service against this profile.
+Retry in Settings is available after a startup failure. Repeated child crashes
+are capped at three automatic restarts. Fix the selected executable or directory
+before retrying. A disabled managed worker stays disabled; bootstrap never
+silently revokes that operator decision.
+
+Build prerequisites are separate from runtime prerequisites:
+
+```bash
+uv python install 3.13.16
+uv sync --all-packages --frozen --python 3.13.16
+npm --prefix apps/desktop ci
+npm --prefix apps/desktop run package:linux
+```
+
+Packaging uses installed Electron and cached hash-locked Python distributions.
+To prepare a build with an empty uv package cache, explicitly stage dependencies
+with `uv run python scripts/stage_desktop_runtime.py --output
+apps/desktop/release/prepare-backend --allow-network` before the offline package
+build. Install/upgrade the resulting `.deb` only with explicit operator approval.
+Uninstall leaves per-user data intact. Downgrades to unsupported schemas fail
+closed; recovery uses an offline verified backup, never an automatic restore.
+
+The automated packaged-runtime test uses temporary profile directories and
+explicit simulated execution. It is not a clean-host GUI install, a real engine
+qualification, a logout-survival test or an installation of systemd units.
+
+
+### Engine update and removal workflow (desktop 0.5.0)
+
+Startup checks the two fixed official GitHub release sources for discovered/configured
+engines. The saved Engine updates checkbox disables automatic network checks.
+Manual checks remain available. No credentials or filesystem inventory are sent;
+only public release API/asset requests are made. Failure/rate limiting is displayed
+without blocking local services. Same-version development builds cannot reliably
+be ordered against a stable release: review is suggested without claiming an upgrade.
+
+Hardware detection runs once at desktop startup; metadata update checks reuse that
+profile. NVIDIA recommendations check compute capability and driver compatibility;
+AMD native builds require a matching observed architecture; llama.cpp can use an
+observed Vulkan GPU. CPU fallback is explicit and does not enable the GPU-only
+optimization lane. Unknown compatibility leaves automatic selection empty. Restart
+after changing drivers. This cache does not suppress worker execution safety checks
+or benchmark telemetry. Advanced retains manual archive selection.
+
+Use Install recommended update. The native
+confirmation identifies the version, archive and download size. Local services keep
+running during download. Installation checks size/SHA-256 and extracts only bounded
+safe archive entries
+with the bundled interpreter and atomically publishes a private side-by-side build.
+llama.cpp CUDA archives include the matching verified CUDA runtime libraries.
+Strata's matching verified control bundle supplies its server and Python runtime.
+After successful publication, idle services restart to discover the new build.
+Unsupported archive layouts fail without touching existing builds. No installer
+script, model download or driver replacement is run. Restart/discover, then select
+the new build explicitly. It still needs normal capability and hardware validation.
+
+Remove build requires a second native confirmation and moves an inactive isolated
+build directory to Trash. It refuses model files, shared supporting files, selected
+builds, broad source/runtime directories and roots outside configured inference
+folders. Finish/cancel jobs before changing engines. Do not manually edit managed
+manifests or move databases. Engine build evidence stays immutable; installing a
+new version does not approve a recipe or change old evidence.
+
+## Start fresh from Settings (desktop 0.6.1)
+
+For a desktop-managed local lab, open **Settings → Start fresh → Reset local
+data…**. Finish/cancel active studies and stop any recipe engine first. A healthy,
+reachable idle controller is required. The native warning defaults to Cancel and
+explains the exact scope. The main process checks idleness before and after it.
+
+Confirmation stops owned local services, moves the app-owned controller/optimizer
+stores, worker state/hash cache, artifacts, backups, configuration and persisted
+credentials to the system Trash, clears local browser storage/cache, and restarts
+at setup. Model files, installed engine builds (including managed builds) and
+unknown manually added files are retained. A remote controller is never reset.
+This is a fresh-start workflow, **not secure erasure**; trashed records may be
+recovered until the user empties Trash through the operating system.
+
+Reset refuses symlinked records and paths overlapping configured model/engine
+roots. If shutdown fails it moves nothing. If Trash fails, it attempts to restore
+all moved records; any incomplete rollback is explicitly reported with data
+retained under `reset-recovery-*` in the application profile. Do not delete such
+a recovery folder before inspecting it. Browser preferences might already be
+cleared if a later step fails, but the lab stores remain preserved.
+
+The action is unavailable in demo/unmanaged mode, during startup, active work or
+other configuration/install operations. It does not bypass a broken/unreachable
+controller; recover local services first using the earlier runbook steps.
