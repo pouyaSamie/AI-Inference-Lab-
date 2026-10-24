@@ -1396,3 +1396,14 @@ Removed five owned temporary paths (extraction, staging and disposable UI/smoke
 profiles) only after checking for running processes. Retained installer/checksum,
 screenshot evidence, original stash and all operator data. Release manifest:
 `docs/evidence/journey-0.6.2/release.json`.
+
+## Public README refresh — 2026-10-24
+
+Reworked the root README for public readers: product purpose, the three-step
+journey, verified 0.6.2 scope, source/package setup, exact bundled Python pin,
+Node/pnpm requirements, independent versus desktop-managed service lifetimes,
+evidence boundaries and documentation links. Documented the current Strata
+search limitation without claiming a performance fix. No application behavior
+changed. A local check validated all 13 relative documentation links, the desktop
+version, package manager version and balanced code fences; `git diff --check`
+passed. Runtime tests were not rerun for this documentation-only change.
