@@ -1,0 +1,469 @@
+{
+  "platform": "linux",
+  "version": "0.6.0",
+  "source": "Explicit offline demo fixtures; disconnected uses unconfigured IPC controller",
+  "inventory": [
+    {
+      "name": "overview-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Overview",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "models-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Models",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "engines-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Engines",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "workers-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Workers",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "optimize-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Optimize",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "live-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Live Runs",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "compare-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Compare",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "recipes-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Recipes",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "updates-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Updates",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "settings-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Settings",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "help-dark-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Help & guide",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "overview-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Overview",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "models-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Models",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "engines-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Engines",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "workers-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Workers",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "optimize-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Optimize",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "live-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Live Runs",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "compare-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Compare",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "recipes-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Recipes",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "updates-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Updates",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "settings-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Settings",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "help-dark-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Help & guide",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "overview-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Overview",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "models-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Models",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "engines-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Engines",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "workers-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Workers",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "optimize-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Optimize",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "live-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Live Runs",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "compare-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Compare",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "recipes-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Recipes",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "updates-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Updates",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "settings-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Settings",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "help-dark-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Help & guide",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "overview-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Overview",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "models-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Models",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "engines-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Engines",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "workers-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Workers",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "optimize-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Optimize",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "live-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Live Runs",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "compare-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Compare",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "recipes-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Recipes",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "updates-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Updates",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "settings-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Settings",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "help-light-1024x768.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Help & guide",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "overview-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Overview",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "models-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Models",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "engines-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Engines",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "workers-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Workers",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "optimize-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Optimize",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "live-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Live Runs",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "compare-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Compare",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "recipes-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Recipes",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "updates-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Updates",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "settings-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Settings",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "help-light-1440x900.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Help & guide",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "overview-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Overview",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "models-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Models",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "engines-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Engines",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "workers-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Workers",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "optimize-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Optimize",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "live-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Live Runs",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "compare-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Compare",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "recipes-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Recipes",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "updates-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Updates",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "settings-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Settings",
+      "demo": true,
+      "node": "undefined"
+    },
+    {
+      "name": "help-light-1920x1080.png",
+      "overflow": false,
+      "title": "AI Inference Optimization Lab · Help & guide",
+      "demo": true,
+      "node": "undefined"
+    }
+  ]
+}

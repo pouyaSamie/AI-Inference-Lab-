@@ -1,0 +1,13 @@
+{
+  "platform": "linux",
+  "source": "Actual Electron CDP keyboard input; explicit demo fixtures, no mutation sent to a controller",
+  "checks": [
+    "Appearance icon supports keyboard activation and persistence",
+    "Dialog isolates sidebar",
+    "Tab enters dialog form",
+    "Shift Tab wraps within dialog",
+    "Escape dismisses and restores focus",
+    "Recipe tabs expose active panel with End key",
+    "Recipe tabs restore JSON with Home key"
+  ]
+}
