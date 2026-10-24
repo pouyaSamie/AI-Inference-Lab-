@@ -24,8 +24,11 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install pinned desktop Python
+        run: uv python install 3.13.16
+
       - name: Install Python workspace
-        run: uv sync --all-packages --frozen
+        run: uv sync --all-packages --frozen --python 3.13.16
 
       - name: Lint
         run: uv run ruff check
@@ -45,5 +48,34 @@ jobs:
       - name: Install Node workspace
         run: pnpm install --frozen-lockfile
 
+      - name: Install desktop dependencies
+        run: npm --prefix apps/desktop ci
+
       - name: Type check generated TypeScript contracts
         run: pnpm typecheck
+
+      - name: Desktop tests
+        run: npm --prefix apps/desktop test
+
+      - name: Desktop build
+        run: npm --prefix apps/desktop run build
+
+      - name: Stage bundled Python runtime
+        run: uv run python scripts/stage_desktop_runtime.py --output apps/desktop/release/ci-backend --allow-network
+
+      - name: Bundled runtime smoke tests
+        env:
+          LAB_TEST_BUNDLED_BACKEND: ${{ github.workspace }}/apps/desktop/release/ci-backend
+        run: uv run pytest -q tests/test_desktop_runtime.py
+
+      - name: Build self-contained Debian package (no installation)
+        run: npm --prefix apps/desktop run package:linux
+
+      - name: Packaged Electron smoke test (sandbox enabled)
+        run: xvfb-run -a node scripts/smoke_packaged_desktop.mjs
+
+      - name: Electron close lifecycle regression (sandbox enabled)
+        run: xvfb-run -a node scripts/smoke_window_lifecycle.mjs
+
+      - name: Synthetic engine installation through bundled extractor
+        run: node scripts/smoke_engine_install.mjs

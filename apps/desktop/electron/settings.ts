@@ -20,18 +20,20 @@ export class SettingsStore {
   private token: string | null = null;
   private persistent = false;
   private loadNote = "";
+  private managed = false;
 
-  constructor(userDataDir: string) {
+  constructor(userDataDir: string, managed = false) {
+    this.managed = managed;
     this.tokenFile = path.join(userDataDir, "operator-token.bin");
     this.storageBackend = this.readStorageBackend();
     this.secureStorage = this.storageBackend !== "basic_text" && safeStorage.isEncryptionAvailable();
-    const defaultUrl = process.env.LAB_API_URL?.trim() || "http://127.0.0.1:8787";
+    const defaultUrl = (managed ? undefined : process.env.LAB_API_URL?.trim()) || "http://127.0.0.1:8787";
     const checked = validateApiBaseUrl(defaultUrl);
     this.apiBaseUrl = checked.ok && checked.value ? checked.value : "http://127.0.0.1:8787";
     if (!checked.ok) {
       this.loadNote = `Ignored invalid LAB_API_URL: ${checked.reason ?? "invalid URL"}.`;
     }
-    const envToken = process.env.LAB_OPERATOR_TOKEN?.trim();
+    const envToken = (managed ? undefined : process.env.LAB_OPERATOR_TOKEN?.trim());
     if (envToken) {
       this.token = envToken;
       this.loadNote = "Using LAB_OPERATOR_TOKEN from the process environment; it is not persisted by the app.";
@@ -58,7 +60,7 @@ export class SettingsStore {
   }
 
   async load(): Promise<void> {
-    if (!this.secureStorage || this.token) return;
+    if (this.managed || !this.secureStorage || this.token) return;
     try {
       const encrypted = await fs.readFile(this.tokenFile);
       const token = safeStorage.decryptString(encrypted).trim();
@@ -101,17 +103,27 @@ export class SettingsStore {
     };
   }
 
+  setManagedConnection(url: string, token: string): void {
+    this.apiBaseUrl = url;
+    this.token = token;
+  }
+
+  clearManagedConnection(): void { this.token = null; }
+
   setApiBaseUrl(raw: string): SettingsStatus {
+    if (this.managed) throw new Error("The local runtime manages its own connection");
     const checked = validateApiBaseUrl(raw);
     if (!checked.ok || !checked.value) {
       throw new Error(checked.reason ?? "API URL is invalid");
     }
+    if (this.apiBaseUrl !== checked.value) { this.token = null; this.persistent = false; }
     this.apiBaseUrl = checked.value;
     this.loadNote = "";
     return this.status();
   }
 
   async setToken(raw: string): Promise<SettingsStatus> {
+    if (this.managed) throw new Error("The local runtime manages its own credentials");
     if (typeof raw !== "string") throw new Error("Token must be a string");
     const token = raw.trim();
     if (token.length === 0 || token.length > 4096) throw new Error("Token length is invalid");
@@ -133,6 +145,7 @@ export class SettingsStore {
   }
 
   async clearToken(): Promise<SettingsStatus> {
+    if (this.managed) throw new Error("The local runtime manages its own credentials");
     this.token = null;
     this.persistent = false;
     this.loadNote = "";

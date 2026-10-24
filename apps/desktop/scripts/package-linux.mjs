@@ -5,6 +5,7 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const packageJson = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));
 const version = String(packageJson.version ?? "0.0.0");
+if (process.platform !== "linux" || !["x64", "arm64"].includes(process.arch)) throw new Error("Build natively on supported Linux x64/arm64");
 const arch = process.arch === "arm64" ? "arm64" : "amd64";
 const releaseDir = path.join(root, "release");
 const stage = path.join(releaseDir, "linux-deb");
@@ -60,11 +61,15 @@ await fs.access(electronDist).catch(() => {
   throw new Error("Electron is not installed. Run `npm install` in apps/desktop first.");
 });
 
+const installedElectron = (await fs.readFile(path.join(electronDist, "version"), "utf8")).trim().replace(/^v/, "");
+if (installedElectron !== packageJson.devDependencies.electron) throw new Error("Installed Electron differs from the pinned package.json version; run npm ci");
 run(process.execPath, [path.join(root, "scripts/build.mjs")]);
 
 await fs.rm(stage, { recursive: true, force: true });
 await fs.mkdir(releaseDir, { recursive: true });
 await copyDirectory(electronDist, appRoot);
+// Electron uses its executable identity to distinguish production packaging.
+await fs.rename(path.join(appRoot, "electron"), path.join(appRoot, "ai-inference-lab-desktop"));
 
 const resources = path.join(appRoot, "resources");
 await fs.rm(path.join(resources, "default_app.asar"), { force: true });
@@ -73,6 +78,9 @@ await fs.mkdir(packagedApp, { recursive: true });
 await copyDirectory(path.join(root, "dist"), path.join(packagedApp, "dist"));
 await copyDirectory(path.join(root, "dist-electron"), path.join(packagedApp, "dist-electron"));
 await normalizeTree(packagedApp, 0o644);
+// Build-host tooling only. The installed package uses its own interpreter.
+const repo = path.resolve(root, "../..");
+run(path.join(repo, ".venv/bin/python"), [path.join(repo, "scripts/stage_desktop_runtime.py"), "--output", path.join(packagedApp, "backend")]);
 await write(
   path.join(packagedApp, "package.json"),
   `${JSON.stringify(
@@ -96,7 +104,7 @@ await fs.chmod(chromeSandbox, 0o4755);
 
 await write(
   path.join(stage, "usr/bin/ai-inference-lab"),
-  "#!/bin/sh\nexec /opt/ai-inference-lab/desktop/electron \"$@\"\n",
+  "#!/bin/sh\nexec /opt/ai-inference-lab/desktop/ai-inference-lab-desktop \"$@\"\n",
   0o755,
 );
 await write(
@@ -109,14 +117,19 @@ Exec=/usr/bin/ai-inference-lab %U
 Icon=ai-inference-lab
 Terminal=false
 Categories=Development;Science;
-StartupWMClass=AI Inference Optimization Lab
+StartupWMClass=ai-inference-lab
 `,
   0o644,
 );
 await fs.mkdir(path.join(stage, "usr/share/icons/hicolor/scalable/apps"), { recursive: true });
 const iconTarget = path.join(stage, "usr/share/icons/hicolor/scalable/apps/ai-inference-lab.svg");
-await fs.copyFile(path.join(root, "build/icon.svg"), iconTarget);
+await fs.copyFile(path.join(root, "public/app-icon.svg"), iconTarget);
 await fs.chmod(iconTarget, 0o644);
+const rasterIcon = path.join(stage, "usr/share/icons/hicolor/256x256/apps/ai-inference-lab.png");
+await fs.mkdir(path.dirname(rasterIcon), { recursive: true });
+await fs.copyFile(path.join(root, "public/app-icon.png"), rasterIcon);
+await fs.chmod(rasterIcon, 0o644);
+
 
 await write(
   path.join(stage, "DEBIAN/control"),
@@ -128,7 +141,8 @@ Architecture: ${arch}
 Maintainer: AI Inference Optimization Lab <operator@localhost>
 Description: Local-first AI inference optimization operator console
  Electron operator UI for the AI Inference Optimization Lab. It connects to a
- separately managed FastAPI controller and never owns benchmark processes.
+ bundled local controller, optimizer and worker with automatic startup.
+ No separate Python installation or API setup is required.
 Depends: libgtk-3-0, libnss3, libx11-xcb1, libxcomposite1, libxdamage1, libxrandr2, libgbm1, libasound2, libatk-bridge2.0-0, libcups2, libdrm2, libxkbcommon0, libpango-1.0-0, libcairo2, libatspi2.0-0
 `,
   0o644,
@@ -155,4 +169,4 @@ await fs.chmod(iconTarget, 0o644);
 run("dpkg-deb", ["--root-owner-group", "--build", stage, output]);
 const stat = await fs.stat(output);
 console.log(`Built ${output} (${(stat.size / 1_048_576).toFixed(1)} MiB).`);
-console.log("Installation, signing and AppImage packaging remain explicit operator/release steps.");
+console.log("Self-contained local runtime included. Installation, signing and AppImage packaging remain explicit operator/release steps.");

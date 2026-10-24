@@ -3,6 +3,17 @@ import { contextBridge, ipcRenderer } from "electron";
 // Sandboxed preload scripts cannot require local modules. Keep this channel list
 // in lockstep with electron/security.ts; main-process validation is authoritative.
 const IPC = {
+  updatesStatus: "lab:engines:updates-status",
+  updatesCheck: "lab:engines:updates-check",
+  updatesPreference: "lab:engines:updates-preference",
+  updatesInstall: "lab:engines:updates-install",
+  engineRemove: "lab:engines:remove",
+  runtimeStatus: "lab:runtime:status",
+  runtimeReset: "lab:runtime:reset-data",
+  runtimeRetry: "lab:runtime:retry",
+  runtimeSelect: "lab:runtime:select",
+  runtimeUseEngine: "lab:runtime:use-engine",
+  runtimeRemoveFolder: "lab:runtime:remove-folder",
   appInfo: "lab:app:info",
   settingsStatus: "lab:settings:status",
   settingsSetUrl: "lab:settings:set-url",
@@ -23,6 +34,21 @@ interface BridgeEvent {
 }
 
 const api = {
+  engineUpdates: {
+    status: () => ipcRenderer.invoke(IPC.updatesStatus),
+    check: () => ipcRenderer.invoke(IPC.updatesCheck),
+    setEnabled: (enabled: boolean) => ipcRenderer.invoke(IPC.updatesPreference, enabled),
+    install: (family: string, assetId: number) => ipcRenderer.invoke(IPC.updatesInstall, family, assetId),
+    remove: (buildId: string) => ipcRenderer.invoke(IPC.engineRemove, buildId),
+  },
+  runtime: {
+    resetData: () => ipcRenderer.invoke(IPC.runtimeReset) as Promise<{ canceled: boolean }>,
+    status: () => ipcRenderer.invoke(IPC.runtimeStatus),
+    retry: () => ipcRenderer.invoke(IPC.runtimeRetry),
+    select: (kind: string) => ipcRenderer.invoke(IPC.runtimeSelect, kind),
+    useEngine: (id: string) => ipcRenderer.invoke(IPC.runtimeUseEngine, id),
+    removeFolder: (kind: string, index: number) => ipcRenderer.invoke(IPC.runtimeRemoveFolder, kind, index),
+  },
   appInfo: () => ipcRenderer.invoke(IPC.appInfo) as Promise<{
     version: string;
     platform: string;

@@ -141,6 +141,17 @@ export function sanitizeMessage(value: unknown): string {
 }
 
 export const IPC = {
+  updatesStatus: "lab:engines:updates-status",
+  updatesCheck: "lab:engines:updates-check",
+  updatesPreference: "lab:engines:updates-preference",
+  updatesInstall: "lab:engines:updates-install",
+  engineRemove: "lab:engines:remove",
+  runtimeStatus: "lab:runtime:status",
+  runtimeReset: "lab:runtime:reset-data",
+  runtimeRetry: "lab:runtime:retry",
+  runtimeSelect: "lab:runtime:select",
+  runtimeUseEngine: "lab:runtime:use-engine",
+  runtimeRemoveFolder: "lab:runtime:remove-folder",
   appInfo: "lab:app:info",
   settingsStatus: "lab:settings:status",
   settingsSetUrl: "lab:settings:set-url",
