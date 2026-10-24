@@ -13,6 +13,8 @@ import json
 import os
 import re
 import struct
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -41,11 +43,34 @@ class FileDigest:
     mtime_ns: int
 
 
+class ModelVerificationCancelled(RuntimeError):
+    pass
+
+
 class HashCache:
     """Persistent SHA-256 cache for large read-only model files."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        hash_paths: frozenset[str] | None = None,
+        progress: bool = False,
+        model_id: str | None = None,
+        cancelled: Callable[[], bool] | None = None,
+    ) -> None:
         self.path = path
+        self.hash_paths = hash_paths
+        self.progress = progress
+        self.model_id = model_id
+        self.cancelled = cancelled
+        self.completed: set[str] = set()
+        self.bytes_done = 0
+        self.last_progress = 0.0
+        self.current_file = ""
+        self.total_bytes = sum(
+            Path(item).stat().st_size for item in (hash_paths or ()) if Path(item).is_file()
+        )
         self._entries: dict[str, FileDigest] = {}
         self._dirty = False
         self._load()
@@ -63,7 +88,12 @@ class HashCache:
             sha = value.get("sha256")
             size = value.get("size_bytes")
             mtime = value.get("mtime_ns")
-            if isinstance(sha, str) and isinstance(size, int) and isinstance(mtime, int):
+            if (
+                isinstance(sha, str)
+                and re.fullmatch(r"[0-9a-f]{64}", sha)
+                and isinstance(size, int)
+                and isinstance(mtime, int)
+            ):
                 self._entries[key] = FileDigest(sha256=sha, size_bytes=size, mtime_ns=mtime)
 
     def flush(self) -> None:
@@ -87,16 +117,76 @@ class HashCache:
             os.fsync(handle.fileno())
         self._dirty = False
 
+    def lookup(self, path: Path) -> FileDigest | None:
+        stat = path.stat()
+        if not path.is_file() or not os.access(path, os.R_OK):
+            return None
+        cached = self._entries.get(str(path))
+        return (
+            cached
+            if cached and cached.size_bytes == stat.st_size and cached.mtime_ns == stat.st_mtime_ns
+            else None
+        )
+
+    def report(self, state: str, *, file: str = "", partial: int = 0, force: bool = False) -> None:
+        if not self.progress or (not force and time.monotonic() - self.last_progress < 0.5):
+            return
+        self.last_progress = time.monotonic()
+        if file:
+            self.current_file = file
+        value = {
+            "state": state,
+            "model_id": self.model_id,
+            "bytes_done": self.bytes_done + partial,
+            "bytes_total": self.total_bytes,
+            "files_done": len(self.completed),
+            "files_total": len(self.hash_paths or ()),
+            "current_file": Path(self.current_file).name,
+            "current_path": self.current_file,
+            "updated_at": time.time(),
+        }
+        target = self.path.with_name("verification-progress.json")
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            temporary = target.with_suffix(".tmp")
+            temporary.write_text(json.dumps(value))
+            temporary.chmod(0o600)
+            temporary.replace(target)
+        except OSError:
+            pass  # Display progress must never affect identity verification.
+
+    def model_digest(self, path: Path, hashing: bool) -> FileDigest | None:
+        if not hashing or (self.hash_paths is not None and str(path) not in self.hash_paths):
+            return self.lookup(path)
+        value = self.digest(path)
+        if str(path) not in self.completed:
+            self.flush()
+            self.completed.add(str(path))
+            self.bytes_done += value.size_bytes
+            self.report("verifying", force=True)
+        return value
+
     def digest(self, path: Path) -> FileDigest:
+        if self.cancelled and self.cancelled():
+            raise ModelVerificationCancelled(
+                "Model verification interrupted by shutdown; cached files are preserved"
+            )
         stat = path.stat()
         key = str(path)
-        cached = self._entries.get(key)
-        if cached and cached.size_bytes == stat.st_size and cached.mtime_ns == stat.st_mtime_ns:
+        cached = self.lookup(path)
+        if cached:
             return cached
         digest = hashlib.sha256()
+        partial = 0
         with path.open("rb") as handle:
             while chunk := handle.read(8 * 1024 * 1024):
+                if self.cancelled and self.cancelled():
+                    raise ModelVerificationCancelled(
+                        "Model verification interrupted by shutdown; cached files are preserved"
+                    )
                 digest.update(chunk)
+                partial += len(chunk)
+                self.report("verifying", file=str(path), partial=partial)
         after = path.stat()
         if after.st_size != stat.st_size or after.st_mtime_ns != stat.st_mtime_ns:
             raise ModelDiscoveryError(f"model file changed while hashing: {path}")
@@ -300,7 +390,7 @@ def _group_ggufs(paths: list[Path]) -> dict[str, list[tuple[int, int, Path]]]:
     for path in paths:
         if path.suffix.lower() != ".gguf":
             continue
-        if "mmproj" in path.name.lower():
+        if "mmproj" in path.name.lower() or path.name.lower().startswith("mtp-"):
             continue
         match = _SHARD_RE.match(path.name)
         if match:
@@ -342,8 +432,6 @@ def discover_llamacpp_models(
             warnings.append(f"MODEL_SHARD_LIMIT:{key}:{len(shards)}")
             continue
         first = shards[0][2]
-        if any("strata" in part.lower() for part in first.parts):
-            continue
         metadata: GgufMetadata | None = None
         try:
             metadata = read_gguf_metadata(first)
@@ -363,7 +451,7 @@ def discover_llamacpp_models(
         for index, count, path in shards:
             try:
                 size = path.stat().st_size
-                digest = cache.digest(path) if hashing else None
+                digest = cache.model_digest(path, hashing)
             except (OSError, ModelDiscoveryError) as exc:
                 warnings.append(f"MODEL_HASH_FAILED:{path.name}:{type(exc).__name__}")
                 verified = False
@@ -568,7 +656,7 @@ def discover_strata_models(
                 continue
             try:
                 size = path.stat().st_size
-                digest = cache.digest(path) if hashing else None
+                digest = cache.model_digest(path, hashing)
             except (OSError, ModelDiscoveryError) as exc:
                 warnings.append(f"STRATA_HASH_FAILED:{path.name}:{type(exc).__name__}")
                 verified = False
@@ -600,7 +688,7 @@ def discover_strata_models(
             native_path, native_size, _native_index = resolved_shards[0]
             for path, size, index in resolved_shards:
                 try:
-                    digest = cache.digest(path) if hashing else None
+                    digest = cache.model_digest(path, hashing)
                 except (OSError, ModelDiscoveryError) as exc:
                     warnings.append(f"STRATA_NATIVE_HASH_FAILED:{path.name}:{type(exc).__name__}")
                     digest = None
@@ -619,7 +707,7 @@ def discover_strata_models(
                         shard_count=len(resolved_shards) if len(resolved_shards) > 1 else None,
                     )
                 )
-        if not hashing or not all(item.verified for item in files):
+        if not all(item.verified for item in files):
             verified = False
         metadata = {
             "model_type": "strata-pack",
@@ -664,11 +752,22 @@ def discover_models(
     roots: tuple[Path, ...] | None = None,
     warnings: list[str] | None = None,
     hash_models: bool | None = None,
+    hash_paths: frozenset[str] | None = None,
+    model_id: str | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> tuple[ModelArtifact, ...]:
     settings.ensure_directories()
-    cache = HashCache(settings.resolved_hash_cache)
+    cache = HashCache(
+        settings.resolved_hash_cache,
+        hash_paths=hash_paths,
+        progress=bool(hash_models),
+        model_id=model_id,
+        cancelled=cancelled,
+    )
+    cache.report("verifying", force=True)
     warnings = warnings if warnings is not None else []
     models: list[ModelArtifact] = []
+    completed_scan = False
     try:
         models.extend(
             discover_llamacpp_models(
@@ -680,11 +779,21 @@ def discover_models(
                 settings, cache=cache, roots=roots, warnings=warnings, hash_models=hash_models
             )
         )
+        completed_scan = True
     finally:
         try:
             cache.flush()
+            complete = completed_scan and all(model.verified for model in models)
+            for item in hash_paths or ():
+                try:
+                    if cache.lookup(Path(item)) is None:
+                        complete = False
+                except OSError:
+                    complete = False
+            cache.report("complete" if complete else "failed", force=True)
         except OSError as exc:
             warnings.append(f"HASH_CACHE_WRITE_FAILED:{type(exc).__name__}")
+            cache.report("failed", force=True)
     return tuple(models)
 
 

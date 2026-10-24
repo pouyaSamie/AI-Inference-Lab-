@@ -234,6 +234,23 @@ def test_llamacpp_parses_native_and_server_fixtures_without_inventing_metrics() 
     assert "time_to_first_token_ms" in serving.unavailable_reasons
 
 
+def test_llamacpp_quantized_value_search_requires_explicit_flash_attention() -> None:
+    adapter = registry().get(EngineId.LLAMACPP)
+    space = adapter.search_space(
+        SearchSpaceRequest(
+            engine_id=EngineId.LLAMACPP,
+            model_architecture="gemma",
+            context_tokens=4096,
+            objective="balanced",
+        )
+    )
+    value = space.dimension("cache_type_v")
+    assert value is not None
+    assert not space.is_active(value, {"flash_attn": "off"})
+    assert not space.is_active(value, {"flash_attn": "auto"})
+    assert space.is_active(value, {"flash_attn": "on"})
+
+
 def test_strata_fixture_manifest_numeric_types_and_search_space() -> None:
     adapter = registry().get(EngineId.STRATA)
     binary = _binary(EngineId.STRATA, BinaryKind.CLI, "strata")
@@ -271,6 +288,17 @@ def test_strata_fixture_manifest_numeric_types_and_search_space() -> None:
     assert space.dimension("expert_cache").kind is DimensionKind.INT  # type: ignore[union-attr]
     assert space.dimension("pool_workers").minimum == 0  # type: ignore[union-attr]
     assert space.dimension("batch").choices == (1, 2, 4)  # type: ignore[union-attr]
+    iq_space = adapter.search_space(
+        SearchSpaceRequest(
+            engine_id=EngineId.STRATA,
+            model_architecture="strata-pack",
+            model_quantization="IQ1_M",
+            context_tokens=4096,
+            objective="balanced",
+        )
+    )
+    assert iq_space.dimension("spec").minimum == 2  # type: ignore[union-attr]
+    assert iq_space.dimension("prefill").default == "auto"  # type: ignore[union-attr]
 
 
 def test_strata_candidate_validation_rejects_auto_expert_cache_and_bad_numbers() -> None:
@@ -386,6 +414,7 @@ def test_strata_profile_emits_observed_flags_and_never_stringifies_native_marker
     generated = plan.generated_files[0]
     assert generated.relative_path == "strata-profile.json"
     document = json.loads(generated.content)
+    assert document["log"] == "/tmp/lab-conformance/logs/strata-engine.log"
     assert document["gpu"] == [0, 1]
     assert document["tokenizer"] == "/models/Strata/packs/q2_0/tokenizer"
     args = document["args"]
@@ -449,3 +478,83 @@ def test_strata_refuses_native_benchmark_and_parses_serving_status() -> None:
 def test_observed_flags_ignores_prose_only_mentions() -> None:
     text = "  --spec N\n  --spec-min-p P\n  use --calibrate for more\n  use --max-context <=256\n"
     assert observed_flags(text) == frozenset({"--spec", "--spec-min-p"})
+
+
+def test_llamacpp_native_rows_use_observed_token_counts_when_test_label_is_absent():
+    import json
+
+    adapter, _, _ = _llamacpp_manifest()
+    document = [
+        {"n_prompt": 1024, "n_gen": 0, "avg_ts": 1438.0},
+        {"n_prompt": 0, "n_gen": 256, "avg_ts": 41.6},
+    ]
+    evidence = RawEvidence(
+        evidence_id="token-count-schema",
+        path="fixture.json",
+        content_type="application/json",
+        text=json.dumps(document),
+    )
+    parsed = adapter.parse_microbench_evidence(evidence, _candidate(EngineId.LLAMACPP, {}))
+    assert parsed.prefill_row().avg_ts == 1438.0
+    assert parsed.decode_row().avg_ts == 41.6
+    document[0]["n_gen"] = 256
+    with pytest.raises(ValueError, match="unambiguous"):
+        adapter.parse_microbench_evidence(
+            evidence.model_copy(update={"text": json.dumps(document)}), _candidate(EngineId.LLAMACPP, {})
+        )
+
+
+def test_llamacpp_answer_benchmark_policy_is_explicit_and_capability_checked():
+    adapter, binary, manifest = _llamacpp_manifest()
+    space = adapter.search_space(
+        SearchSpaceRequest(
+            engine_id=EngineId.LLAMACPP,
+            model_architecture="gemma4",
+            context_tokens=4096,
+            objective="balanced",
+        )
+    )
+    assert space.fixed_parameters["reasoning"] == "off"
+    candidate = _candidate(EngineId.LLAMACPP, {"reasoning": "off"})
+    assert adapter.validate_candidate(candidate, manifest) == ()
+    plan = adapter.build_server_plan(
+        candidate, _sandbox(), binary=binary, model=_llamacpp_model(), port=18080
+    )
+    args = plan.start.command.argv
+    assert args[args.index("--reasoning") + 1] == "off"
+    missing = manifest.model_copy(
+        update={"descriptors": tuple(d for d in manifest.descriptors if d.key != "--reasoning")}
+    )
+    assert adapter.validate_candidate(candidate, missing)
+
+
+def test_strata_answer_policy_is_a_wrapper_key_not_an_unobserved_native_flag():
+    adapter = registry().get(EngineId.STRATA)
+    from lab_adapters.strata.adapter import StrataAdapter
+
+    space = StrataAdapter().search_space(
+        SearchSpaceRequest(
+            engine_id=EngineId.STRATA,
+            model_architecture="strata",
+            context_tokens=4096,
+            objective="balanced",
+        )
+    )
+    assert space.fixed_parameters["reasoning_effort"] == "none"
+    candidate = _candidate(EngineId.STRATA, {"reasoning_effort": "none"})
+    # The serving key is validated independently from the native CLI surface.
+    binary = _binary(EngineId.STRATA, BinaryKind.CLI, "strata")
+    manifest = adapter.parse_probe_output(
+        (
+            ProcessOutput(
+                command_id="strata-version", exit_code=0, stderr=(STRATA / "version.txt").read_text()
+            ),
+            ProcessOutput(
+                command_id="strata-help", exit_code=0, stderr=(STRATA / "generate-help.txt").read_text()
+            ),
+        ),
+        binary,
+    )
+    assert adapter.validate_candidate(candidate, manifest) == ()
+    invalid = _candidate(EngineId.STRATA, {"reasoning_effort": "invalid"})
+    assert adapter.validate_candidate(invalid, manifest)

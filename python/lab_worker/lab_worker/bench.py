@@ -78,6 +78,7 @@ class ServingRun:
     measured_prompt_tokens: int | None = None
     truncated: bool = False
     finish_reason: str | None = None
+    cached_prompt_tokens: int = 0
 
     @property
     def completed(self) -> bool:
@@ -362,6 +363,11 @@ def _parse_sse(
     finished = time.perf_counter()
     prompt_tokens = usage.get("prompt_tokens")
     output_tokens = usage.get("completion_tokens")
+    prompt_details = usage.get("prompt_tokens_details")
+    cached = prompt_details.get("cached_tokens", 0) if isinstance(prompt_details, dict) else 0
+    cached = int(cached) if isinstance(cached, (int, float)) and cached > 0 else 0
+    if cached and cancel_error is None:
+        cancel_error = "cached prompt tokens were reused; fresh-prompt throughput cannot be measured"
     ttft = (first_content_at - started) * 1000.0 if first_content_at is not None else None
     total = (finished - started) * 1000.0
     if ttft is None:
@@ -384,6 +390,7 @@ def _parse_sse(
         http_status=response.status_code,
         truncated=truncated,
         finish_reason=finish_reason,
+        cached_prompt_tokens=cached,
     )
 
 
@@ -426,6 +433,18 @@ def run_serving_workload(
         trust_env=False,
     )
     try:
+        if engine_id == "strata":
+            # Strata's live slot reuses prefixes even with conversation parking
+            # disabled. Reset only this leased, worker-owned model before the
+            # timed interval; the wrapper and its registered identity remain.
+            for path in ("/v1/unload", "/v1/load"):
+                reset = _json_post(client, path, {"model": model_name})
+                if reset is None or reset.get("error"):
+                    raise httpx.HTTPError("Strata could not reset its owned prompt cache before measurement")
+                if on_tick is not None:
+                    on_tick()
+                if cancel_event is not None and cancel_event.is_set():
+                    raise httpx.HTTPError("cancelled by operator")
         document = _props(client)
         effective = _effective_context(document)
         target = target_input_tokens
@@ -464,7 +483,11 @@ def run_serving_workload(
             "top_p": top_p,
             "seed": seed,
             "stream": True,
+            "stream_options": {"include_usage": True},
         }
+        if engine_id == "llamacpp":
+            # Repetitions must measure prompt evaluation, not a cached prefix.
+            payload["cache_prompt"] = False
         started = time.perf_counter()
         with client.stream("POST", "/v1/chat/completions", json=payload) as response:
             if response.status_code >= 400:

@@ -13,6 +13,7 @@ from pathlib import Path
 from threading import Event
 from typing import Any, cast
 
+import psutil
 from lab_core.ids import sha256_hex
 
 from lab_core import (
@@ -48,14 +49,19 @@ from lab_core import (
     QualityGateStatus,
     RawEvidence,
     RawEvidenceRef,
+    RecipeChatPayload,
+    RunRecipePayload,
     ScanPayload,
     ScanResult,
+    SearchSpaceRequest,
+    StopRecipePayload,
     TelemetryCoverage,
     TrialResult,
     VerifyRecipePayload,
     VerifyRecipeResult,
     WorkerCommandLease,
     WorkloadSuite,
+    utcnow,
 )
 
 from .bench import (
@@ -74,6 +80,7 @@ from .engines import EngineBundle, discover_engines, sha256_file
 from .gpu import GpuLease, GpuLeaseError, GpuLeaseManager
 from .hardware import TelemetrySummary, gpu_preflight
 from .journal import WorkerJournal
+from .recipe_server import RecipeServer
 from .runner import ProcessRunner, RunResult, ServerProcess, allocate_loopback_port
 from .sandbox import create_sandbox
 
@@ -84,10 +91,50 @@ class RealExecutionError(RuntimeError):
     pass
 
 
+def _strata_memory_failure(parameters: dict[str, Any], model: ModelArtifact) -> FailureInfo | None:
+    # Old frozen plans can predate the conservative adapter defaults. Never
+    # silently change their parameters or let them pin an entire expert pack.
+    if (
+        parameters.get("mmap_experts") is not True
+        or parameters.get("resident_experts") is not False
+        or parameters.get("ple_io") not in {"direct", "mmap"}
+    ):
+        return FailureInfo(
+            kind=FailureKind.INSUFFICIENT_RAM,
+            message="This Strata plan can reserve an unbounded amount of system memory. "
+            "Create a new test using file-backed experts and direct table I/O.",
+        )
+    profile = model.metadata.get("expert_profile")
+    if profile:
+        entry = next((item for item in model.files if item.path == profile), None)
+        try:
+            valid = entry is not None and entry.verified and sha256_file(Path(profile)) == entry.sha256
+        except OSError:
+            valid = False
+        if not valid:
+            return FailureInfo(
+                kind=FailureKind.UNSUPPORTED_MODEL,
+                message="The Strata expert profile changed or is unreadable. "
+                "Rescan the model and engine folders.",
+            )
+    dense_bytes = sum(item.size_bytes for item in model.files if item.path.rsplit("/", 1)[-1] == "dense.bin")
+    required = dense_bytes + 6 * 1024**3
+    if psutil.virtual_memory().available < required:
+        return FailureInfo(
+            kind=FailureKind.INSUFFICIENT_RAM,
+            message="Not enough available system memory for Strata's dense weights, "
+            "working buffers and a 6 GiB safety reserve. Close unused applications and retry.",
+            retryable=True,
+        )
+    return None
+
+
 def _failure_kind(text: str, *, cancelled: bool, timed_out: bool) -> tuple[FailureKind, OOMStage]:
     lower = text.lower()
     if cancelled:
         return FailureKind.CANCELLED, OOMStage.UNKNOWN
+    if "cached prompt tokens" in lower:
+        return FailureKind.CONTEXT_MISMATCH, OOMStage.UNKNOWN
     if timed_out or "timed out" in lower:
         return FailureKind.TIMEOUT, OOMStage.UNKNOWN
     if any(
@@ -145,6 +192,7 @@ class RealExecutor:
         discovery: DiscoveryResult | None = None,
     ) -> None:
         self.settings = settings
+        self.booted_at = utcnow()
         self.client = client
         self.journal = journal or WorkerJournal(settings.resolved_journal_root, settings.worker_id)
         self.leases = leases or GpuLeaseManager(settings.resolved_lease_root, settings.worker_id)
@@ -160,14 +208,20 @@ class RealExecutor:
         )
         self._active: dict[str, Event] = {}
         self._lock = threading.Lock()
+        self._verification_stop = Event()
         self._last_scan: DiscoveryResult | None = discovery
         self._current_command: str | None = None
+        self.serving = RecipeServer(self)
 
     # --------------------------------------------------------------- plumbing
     def _reindex(self) -> None:
         registry: dict[str, Any] = {}
         for bundle in self._engines:
-            registry.update(bundle.binaries)
+            for binary in bundle.binaries.values():
+                existing = registry.get(binary.executable_id)
+                if existing is not None and existing != binary:
+                    raise RealExecutionError(f"conflicting executable registration: {binary.executable_id}")
+                registry[binary.executable_id] = binary
         self._registry = registry
         if getattr(self, "runner", None) is not None:
             self.runner.binaries = registry
@@ -229,7 +283,7 @@ class RealExecutor:
             if command.command_type is CommandType.SCAN:
                 result = self._scan(cast(ScanPayload, command.payload))
             elif command.command_type is CommandType.PREFLIGHT:
-                result = self._preflight(cast(PreflightPayload, command.payload))
+                result = self._preflight(cast(PreflightPayload, command.payload), lease)
             elif command.command_type is CommandType.CLAIM_TRIAL:
                 result = self._trial(cast(ClaimTrialPayload, command.payload), lease)
             elif command.command_type is CommandType.PAUSE:
@@ -240,6 +294,16 @@ class RealExecutor:
                 result = self._verify(cast(VerifyRecipePayload, command.payload))
             elif command.command_type is CommandType.PROMOTE:
                 result = self._promote(cast(PromotePayload, command.payload))
+            elif command.command_type is CommandType.RUN_RECIPE:
+                result = self.serving.start(
+                    cast(RunRecipePayload, command.payload), command.command_id, self._renew_callback(lease)
+                )
+            elif command.command_type is CommandType.STOP_RECIPE:
+                result = self.serving.stop(cast(StopRecipePayload, command.payload))
+            elif command.command_type is CommandType.RECIPE_CHAT:
+                result = self.serving.chat(
+                    cast(RecipeChatPayload, command.payload), self._renew_callback(lease)
+                )
             else:
                 raise RealExecutionError(f"unsupported command type {command.command_type}")
             outcome = CommandStatus.COMPLETED
@@ -291,6 +355,18 @@ class RealExecutor:
             warnings.append("SCAN_ROOTS_OUTSIDE_CONFIGURED_MODEL_ROOTS")
             requested = list(allowed)
         revision = max(self._snapshot_revision + 1, 1)
+        selected = (
+            self._last_scan.snapshot.model(payload.model_id) if payload.model_id and self._last_scan else None
+        )
+        if payload.model_id and selected is None:
+            raise ValueError("Selected model is no longer in inventory; refresh models first")
+        hash_paths = (
+            frozenset(file.path for file in selected.files)
+            if selected
+            else frozenset(file.path for model in self._last_scan.snapshot.models for file in model.files)
+            if payload.hash_models and self._last_scan
+            else None
+        )
         discovery = discover_snapshot(
             self.settings,
             revision=revision,
@@ -301,7 +377,14 @@ class RealExecutor:
             include_models=payload.include_models,
             include_hardware=payload.include_hardware,
             hash_models=payload.hash_models,
+            hash_paths=hash_paths,
+            cancelled=self._verification_stop.is_set,
+            model_id=payload.model_id,
+            hardware_snapshot=self._last_scan.snapshot.hardware
+            if self._last_scan and not payload.include_hardware
+            else None,
         )
+        self.discovery = discovery
         self._last_scan = discovery
         self._snapshot_revision = discovery.snapshot.revision
         self._engines = discovery.engines
@@ -310,7 +393,9 @@ class RealExecutor:
         return ScanResult(snapshot=discovery.snapshot, warnings=tuple(dict.fromkeys(warnings)))
 
     # -------------------------------------------------------------- preflight
-    def _preflight(self, payload: PreflightPayload) -> PreflightResult:
+    def _preflight(
+        self, payload: PreflightPayload, lease: WorkerCommandLease | None = None
+    ) -> PreflightResult:
         model = self._model(payload)
         bundle = self._bundle(payload.engine.engine_id.value)
         if bundle.manifest.engine.executable_sha256 != payload.engine.executable_sha256:
@@ -354,9 +439,9 @@ class RealExecutor:
         )
         proof: ContextFeasibility | None = None
         probe_context: ContextLength | None = None
-        if supported and bundle.engine_id.value == "llamacpp" and payload.full_context_check:
+        if supported and payload.full_context_check:
             probe_context = max(supported, key=int)
-            proof = self._preflight_allocation(payload, bundle, model, probe_context)
+            proof = self._preflight_allocation(payload, bundle, model, probe_context, lease)
         feasibility: list[ContextFeasibility] = []
         for context in contexts:
             if context not in ContextLength:
@@ -377,19 +462,6 @@ class RealExecutor:
                             f"model metadata declares a {model.metadata_context_tokens}-token training "
                             f"context; {int(context)} was not claimed as feasible"
                         ),
-                    )
-                )
-                continue
-            if bundle.engine_id.value != "llamacpp":
-                feasibility.append(
-                    ContextFeasibility(
-                        context=context,
-                        status=FeasibilityOutcome.INCONCLUSIVE,
-                        reason=(
-                            "the installed Strata build has no calibration command; a full-context "
-                            "allocation proof will be added with the Phase 4 serving harness"
-                        ),
-                        requires_full_context_proof=True,
                     )
                 )
                 continue
@@ -420,8 +492,8 @@ class RealExecutor:
                         status=FeasibilityOutcome.FEASIBLE,
                         estimated_vram_bytes=None,
                         reason=(
-                            f"covered by the full-context CPU allocation proof at {int(probe_context)}; "
-                            "GPU fit is measured by each candidate trial, not inferred here"
+                            f"covered by the managed allocation proof at {int(probe_context)}; "
+                            "each candidate still requires full-context serving and memory checks"
                         ),
                         evidence=(*proof.evidence, f"proof_context={int(probe_context)}"),
                         requires_full_context_proof=True,
@@ -449,9 +521,9 @@ class RealExecutor:
             snapshot_revision=self._snapshot_revision,
             snapshot=self._last_scan.snapshot if self._last_scan else None,
             message=(
-                "full-context CPU allocation proof completed"
+                "managed full-context allocation proof completed"
                 if passed
-                else "at least one selected context is not proven feasible"
+                else (proof.reason if proof else "at least one selected context is not proven feasible")
             ),
         )
 
@@ -461,17 +533,92 @@ class RealExecutor:
         bundle: EngineBundle,
         model: ModelArtifact,
         context: ContextLength,
+        command_lease: WorkerCommandLease | None = None,
+    ) -> ContextFeasibility:
+        cancel_event = Event()
+        gpu_lease: GpuLease | None = None
+        with self._lock:
+            self._active[payload.experiment_id] = cancel_event
+        try:
+            if bundle.engine_id.value == "strata":
+                uuids = tuple(payload.gpu_uuids) or tuple(self.settings.gpu_uuids)
+                if not uuids and self._last_scan and self._last_scan.snapshot.hardware.gpus:
+                    uuids = (self._last_scan.snapshot.hardware.gpus[0].uuid,)
+                if not uuids:
+                    return ContextFeasibility(
+                        context=context,
+                        status=FeasibilityOutcome.INCONCLUSIVE,
+                        reason="No GPU was detected for the Strata allocation check.",
+                    )
+                allowed, _reasons = gpu_preflight(self.settings, uuids[0])
+                if not allowed:
+                    return ContextFeasibility(
+                        context=context,
+                        status=FeasibilityOutcome.INCONCLUSIVE,
+                        reason=(
+                            "The GPU is busy or lacks safe memory/temperature headroom. "
+                            "Retry when it is quiet."
+                        ),
+                    )
+                gpu_lease = self.leases.acquire(
+                    uuids,
+                    command_id=command_lease.command.command_id
+                    if command_lease
+                    else f"preflight-{payload.experiment_id}",
+                )
+            return self._preflight_managed_allocation(
+                payload, bundle, model, context, gpu_lease, cancel_event, command_lease
+            )
+        finally:
+            if gpu_lease is not None:
+                gpu_lease.release()
+            with self._lock:
+                self._active.pop(payload.experiment_id, None)
+
+    def _preflight_managed_allocation(
+        self,
+        payload: PreflightPayload,
+        bundle: EngineBundle,
+        model: ModelArtifact,
+        context: ContextLength,
+        gpu_lease: GpuLease | None,
+        cancel_event: Event,
+        command_lease: WorkerCommandLease | None,
     ) -> ContextFeasibility:
         if bundle.server_binary is None or not model.path_map:
             return ContextFeasibility(
                 context=context,
                 status=FeasibilityOutcome.INCONCLUSIVE,
-                reason="no usable llama-server binary or model path was observed",
+                reason="no usable server binary or model path was observed",
             )
         command_id = f"preflight-{payload.experiment_id}-{int(context)}"
         sandbox = create_sandbox(self.settings, command_id)
         port = allocate_loopback_port()
-        command = bundle.adapter.build_server_plan(
+        parameters: dict[str, Any] = {"gpu_layers": 0}
+        if bundle.engine_id.value == "strata":
+            space = bundle.adapter.search_space(
+                SearchSpaceRequest(
+                    engine_id=bundle.engine_id,
+                    model_architecture=model.model_family,
+                    model_quantization=model.quantization,
+                    context_tokens=int(context),
+                    objective="balanced",
+                )
+            )
+            parameters = dict(space.fixed_parameters)
+            for dimension in space.dimensions:
+                if space.is_active(dimension, parameters):
+                    parameters[dimension.name] = dimension.default
+        if bundle.engine_id.value == "strata":
+            memory_failure = _strata_memory_failure(parameters, model)
+            if memory_failure:
+                return ContextFeasibility(
+                    context=context,
+                    status=FeasibilityOutcome.RESOURCE_INFEASIBLE,
+                    reason=memory_failure.message,
+                    evidence=(memory_failure.kind.value,),
+                )
+        server_plan = bundle.adapter.build_server_plan(
             CandidateSpec(
                 study_id=f"preflight-{payload.experiment_id}",
                 experiment_id=payload.experiment_id,
@@ -481,20 +628,24 @@ class RealExecutor:
                 model_digest=model.artifact_digest,
                 worker_id=self.settings.worker_id,
                 context=context,
-                parameters={"gpu_layers": 0},
+                parameters=parameters,
                 workload_digest=sha256_hex({"preflight": payload.spec_digest}),
             ),
             sandbox,
             binary=bundle.server_binary,
             model=model,
             port=port,
-        ).start.command
+        )
+        _write_generated_files(server_plan, Path(sandbox.work_dir))
         server, result = self.runner.start_server(
             command_id=command_id,
             stage="preflight-context",
-            command=command,
+            command=server_plan.start.command,
             sandbox=sandbox,
             port=port,
+            lease=gpu_lease,
+            cancel_event=cancel_event,
+            on_tick=self._renew_callback(command_lease) if command_lease else None,
         )
         try:
             if server is None:
@@ -507,7 +658,7 @@ class RealExecutor:
                     return ContextFeasibility(
                         context=context,
                         status=FeasibilityOutcome.RESOURCE_INFEASIBLE,
-                        reason=f"full-context CPU allocation failed ({kind.value})",
+                        reason=f"managed full-context allocation failed ({kind.value})",
                         evidence=(f"process_exit={result.exit_code}",),
                     )
                 return ContextFeasibility(
@@ -515,6 +666,12 @@ class RealExecutor:
                     status=FeasibilityOutcome.INCONCLUSIVE,
                     reason=result.error or f"context allocation probe failed ({kind.value})",
                     evidence=(f"process_exit={result.exit_code}",),
+                )
+            if cancel_event.is_set():
+                return ContextFeasibility(
+                    context=context,
+                    status=FeasibilityOutcome.INCONCLUSIVE,
+                    reason="The allocation check was cancelled; no context proof was recorded.",
                 )
             effective, document = effective_context(port)
             if effective is None:
@@ -535,12 +692,12 @@ class RealExecutor:
                 status=FeasibilityOutcome.FEASIBLE,
                 estimated_vram_bytes=None,
                 reason=(
-                    "full-context CPU allocation proof passed at this context; "
-                    "GPU fit is measured by each candidate trial, not inferred here"
+                    "managed allocation proof passed at this context; "
+                    "each candidate still requires full-context serving and memory checks"
                 ),
                 evidence=(
                     f"effective_context={effective}",
-                    "allocation_gpu_layers=0",
+                    "allocation_gpu_layers=0" if gpu_lease is None else "allocation_gpu_lease=held",
                     f"status_digest={sha256_hex(document)}",
                 ),
                 requires_full_context_proof=True,
@@ -625,6 +782,17 @@ class RealExecutor:
                     evidence_kind=EvidenceKind.NATIVE_MICROBENCH,
                 )
             )
+        if bundle.engine_id.value == "strata":
+            memory_failure = _strata_memory_failure(dict(candidate.parameters), model)
+            if memory_failure:
+                return TrialResult(
+                    observation=self._failed_observation(
+                        payload,
+                        candidate_id=candidate.candidate_id,
+                        failure=memory_failure,
+                        evidence_kind=EvidenceKind.NATIVE_MICROBENCH,
+                    )
+                )
         gpu_layers = candidate.parameters.get("gpu_layers", -1)
         needs_gpu = not (
             bundle.engine_id.value == "llamacpp" and isinstance(gpu_layers, int) and gpu_layers == 0

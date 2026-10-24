@@ -121,7 +121,12 @@ class WorkerClient:
             protocol_version=self.settings.protocol_version,
             platform="linux",
             enrolled_at=utcnow(),
-            roles=("benchmark", "simulated" if self.settings.simulated else "real"),
+            roles=(
+                "benchmark",
+                "simulated" if self.settings.simulated else "real",
+                "targeted-model-verification",
+                *(("recipe-serving",) if not self.settings.simulated else ()),
+            ),
         )
         hardware = (
             build_hardware(self.settings) if self.settings.simulated else collect_hardware(self.settings)

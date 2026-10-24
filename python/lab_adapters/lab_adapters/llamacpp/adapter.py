@@ -14,7 +14,7 @@ from typing import Any, ClassVar
 
 from lab_core.adapter_io import AdapterDescriptor
 from lab_core.ids import sha256_text
-from lab_core.search import DimensionKind, ParameterDimension
+from lab_core.search import ConditionOperator, DimensionKind, ParameterDimension, SearchCondition
 from lab_core.version import ADAPTER_SDK_VERSION
 
 from lab_core import (
@@ -189,6 +189,7 @@ class LlamaCppAdapter(InferenceAdapter):
             "--threads": (CapabilityKind.INT, {"minimum": 1, "maximum": 256, "default": -1}),
             "--batch-size": (CapabilityKind.INT, {"minimum": 1, "maximum": 8192, "default": 2048}),
             "--ubatch-size": (CapabilityKind.INT, {"minimum": 1, "maximum": 4096, "default": 512}),
+            "--reasoning": (CapabilityKind.ENUM, {"legal_values": ("on", "off", "auto"), "default": "auto"}),
             "--flash-attn": (CapabilityKind.ENUM, {"legal_values": ("on", "off", "auto"), "default": "auto"}),
             "--cache-type-k": (
                 CapabilityKind.ENUM,
@@ -377,6 +378,9 @@ class LlamaCppAdapter(InferenceAdapter):
                 kind=DimensionKind.CATEGORICAL,
                 choices=("f16", "q8_0", "q4_0"),
                 default="f16",
+                conditions=(
+                    SearchCondition(parameter="flash_attn", operator=ConditionOperator.EQ, values=("on",)),
+                ),
                 quality_risk=True,
             ),
         ]
@@ -394,10 +398,14 @@ class LlamaCppAdapter(InferenceAdapter):
         return SearchSpaceSpec(
             engine_id=EngineId.LLAMACPP,
             dimensions=tuple(dimensions),
-            fixed_parameters={"ctx_size": request.context_tokens},
+            fixed_parameters={"ctx_size": request.context_tokens, "reasoning": "off"},
             constraints=("Unknown or unobserved flags are rejected before planning.",),
             max_proposals=256,
-            notes=("Conditional dimensions are declared explicitly for Phase 5 TPE integration.",),
+            notes=(
+                "Conditional dimensions are declared explicitly for Phase 5 TPE integration.",
+                "Serving benchmarks disable reasoning consistently for baseline and candidates "
+                "so the token budget measures answer generation.",
+            ),
         )
 
     def validate_candidate(
@@ -409,6 +417,7 @@ class LlamaCppAdapter(InferenceAdapter):
             "threads": "--threads",
             "batch": "--batch-size",
             "ubatch": "--ubatch-size",
+            "reasoning": "--reasoning",
             "flash_attn": "--flash-attn",
             "cache_type_k": "--cache-type-k",
             "cache_type_v": "--cache-type-v",
@@ -536,6 +545,7 @@ class LlamaCppAdapter(InferenceAdapter):
             "ubatch": "--ubatch-size",
             "gpu_layers": "--n-gpu-layers",
             "n_cpu_moe": "--n-cpu-moe",
+            "reasoning": "--reasoning",
             "flash_attn": "--flash-attn",
             "cache_type_k": "--cache-type-k",
             "cache_type_v": "--cache-type-v",
@@ -588,7 +598,15 @@ class LlamaCppAdapter(InferenceAdapter):
                 raise ValueError("llama-bench JSON rows must be objects")
             test = item.get("test")
             if not isinstance(test, str):
-                raise ValueError("llama-bench row is missing the test name")
+                # Installed build 701 labels rows with token counts rather than
+                # a redundant test string. Mixed/empty rows remain ambiguous.
+                prompt, generation = item.get("n_prompt"), item.get("n_gen")
+                if isinstance(prompt, int) and prompt > 0 and generation == 0:
+                    test = f"pp{prompt}"
+                elif prompt == 0 and isinstance(generation, int) and generation > 0:
+                    test = f"tg{generation}"
+                else:
+                    raise ValueError("llama-bench row has no unambiguous test identity")
             avg_ts = item.get("avg_ts")
             if avg_ts is not None:
                 avg_ts = float(avg_ts)
@@ -767,6 +785,7 @@ class LlamaCppAdapter(InferenceAdapter):
             "ubatch": "--ubatch-size",
             "gpu_layers": "--n-gpu-layers",
             "n_cpu_moe": "--n-cpu-moe",
+            "reasoning": "--reasoning",
             "flash_attn": "--flash-attn",
             "cache_type_k": "--cache-type-k",
             "cache_type_v": "--cache-type-v",

@@ -323,6 +323,11 @@ class StrataAdapter(InferenceAdapter):
             reasons.append("model artifact has no pack_path metadata")
         if not hardware.gpus:
             reasons.append("Strata serving requires a GPU")
+        if model.metadata.get("native") and not model.metadata.get("expert_profile"):
+            reasons.append(
+                "This native pack needs a verified expert profile for speculative serving. "
+                "No expert profile was discovered in the selected engine distribution."
+            )
         warnings: list[str] = []
         if not model.hashes_complete():
             warnings.append("model artifact hashes are incomplete; recipes cannot be approved")
@@ -351,10 +356,10 @@ class StrataAdapter(InferenceAdapter):
                 ParameterDimension(
                     name="expert_cache",
                     kind=DimensionKind.INT,
-                    minimum=0,
-                    maximum=256,
-                    default=0,
-                    description="Resident expert blobs; 0 leaves the adaptive tier disabled.",
+                    minimum=8,
+                    maximum=32,
+                    default=16,
+                    description="Bounded VRAM expert tier required by native pack verification.",
                 ),
                 ParameterDimension(
                     name="prefill",
@@ -363,7 +368,15 @@ class StrataAdapter(InferenceAdapter):
                     default="auto",
                     description="Batched prompt chunk; observed values from the installed help.",
                 ),
-                ParameterDimension(name="spec", kind=DimensionKind.INT, minimum=0, maximum=8, default=4),
+                ParameterDimension(
+                    name="spec",
+                    kind=DimensionKind.INT,
+                    minimum=2,
+                    maximum=8,
+                    default=2,
+                    description="Native packs require a speculative window of at least two tokens "
+                    "and the matching expert profile shipped with the engine.",
+                ),
                 ParameterDimension(
                     name="spec_min_p",
                     kind=DimensionKind.FLOAT,
@@ -401,26 +414,21 @@ class StrataAdapter(InferenceAdapter):
                     default=1,
                     description="Serve-mode batch slots; 1 keeps the single-request path.",
                 ),
-                ParameterDimension(
-                    name="ple_io",
-                    kind=DimensionKind.CATEGORICAL,
-                    choices=("direct", "mmap", "ram"),
-                    default="direct",
-                ),
-                ParameterDimension(
-                    name="resident_experts",
-                    kind=DimensionKind.CATEGORICAL,
-                    choices=(False, True),
-                    default=False,
-                ),
-                ParameterDimension(
-                    name="mmap_experts", kind=DimensionKind.CATEGORICAL, choices=(False, True), default=False
-                ),
             ),
-            fixed_parameters={"max_context": request.context_tokens},
+            fixed_parameters={
+                "max_context": request.context_tokens,
+                "reasoning_effort": "none",
+                "ple_io": "direct",
+                "resident_experts": False,
+                "mmap_experts": True,
+            },
             constraints=("Only flags observed in the installed build are emitted.",),
             max_proposals=256,
-            notes=("Strata's native calibration is not a benchmark protocol and is not used here.",),
+            notes=(
+                "Strata's native calibration is not a benchmark protocol and is not used here.",
+                "Experts remain file-backed so the operating system can reclaim memory; "
+                "unbounded resident expert and RAM table modes are excluded.",
+            ),
         )
 
     def validate_candidate(
@@ -445,6 +453,11 @@ class StrataAdapter(InferenceAdapter):
         }
         errors: list[str] = []
         for name, value in candidate.parameters.items():
+            if name == "reasoning_effort":
+                # A serve/server.py configuration key, not a native argv flag.
+                if value not in ("none", "low", "medium", "high"):
+                    errors.append("reasoning_effort must be none, low, medium or high")
+                continue
             flag = mapping.get(name)
             if flag is None:
                 errors.append(f"unknown Strata parameter {name!r}")
@@ -571,6 +584,11 @@ class StrataAdapter(InferenceAdapter):
         if not isinstance(server_script, str):
             raise ValueError("Strata model metadata must include the observed server_script path")
         profile = self._profile(candidate, model, cwd=sandbox.work_dir)
+        # The wrapper otherwise discards the child engine's startup errors.
+        # Keep them in this worker-owned sandbox, never in the model directory.
+        profile["log"] = f"{sandbox.log_dir.rstrip('/')}/strata-engine.log"
+        if "reasoning_effort" in candidate.parameters:
+            profile["reasoning_effort"] = candidate.parameters["reasoning_effort"]
         content = json.dumps(profile, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
         profile_file = GeneratedFile(relative_path="strata-profile.json", content=content)
         profile_path = f"{sandbox.work_dir.rstrip('/')}/{profile_file.relative_path}"

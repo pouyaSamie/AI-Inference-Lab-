@@ -22,9 +22,11 @@ from .version import SCHEMA_VERSION
 class CandidateSpec(FrozenModel):
     """A concrete, reproducible parameter vector for one trial and context.
 
-    ``candidate_id`` is deterministic over engine hash, model digest, worker,
-    context, workload digest and parameters, which makes duplicate proposals
-    detectable across controller and optimizer restarts.
+    ``candidate_id`` is deterministic over the study, engine hash, model digest,
+    worker, context, workload digest and parameters. Scoping the identity to a
+    study keeps repeated experiments with the same baseline from colliding in
+    the controller's global candidate table, while ``semantic_key`` still
+    supports duplicate detection inside one study.
     """
 
     schema_version: NonEmptyStr = SCHEMA_VERSION
@@ -51,8 +53,7 @@ class CandidateSpec(FrozenModel):
             object.__setattr__(self, "parameter_digest", expected_params)
         elif self.parameter_digest != expected_params:
             raise ValueError("parameter_digest does not match parameters")
-        expected_id = stable_id(
-            "cand",
+        identity = (
             self.engine_id,
             self.engine_sha256,
             self.model_digest,
@@ -61,9 +62,13 @@ class CandidateSpec(FrozenModel):
             self.workload_digest,
             self.parameters,
         )
-        if self.candidate_id and self.candidate_id != expected_id:
+        expected_id = stable_id("cand", self.study_id, *identity)
+        # Phase 8 and earlier stored globally-scoped candidate IDs. Keep those
+        # records readable while new candidates use the study-scoped identity.
+        legacy_id = stable_id("cand", *identity)
+        if self.candidate_id and self.candidate_id not in {expected_id, legacy_id}:
             raise ValueError("candidate_id does not match the canonical candidate identity")
-        object.__setattr__(self, "candidate_id", expected_id)
+        object.__setattr__(self, "candidate_id", self.candidate_id or expected_id)
         return self
 
     def semantic_key(self) -> str:

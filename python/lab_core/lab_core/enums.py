@@ -138,6 +138,9 @@ class PlanStatus(StrEnum):
 
 
 class CommandType(StrEnum):
+    RUN_RECIPE = "RUN_RECIPE"
+    STOP_RECIPE = "STOP_RECIPE"
+    RECIPE_CHAT = "RECIPE_CHAT"
     SCAN = "SCAN"
     PREFLIGHT = "PREFLIGHT"
     CLAIM_TRIAL = "CLAIM_TRIAL"

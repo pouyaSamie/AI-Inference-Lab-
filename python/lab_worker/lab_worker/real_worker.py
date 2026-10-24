@@ -55,6 +55,7 @@ class RealWorker:
             self.executor = RealExecutor(settings, client=self.client, discovery=discovery)
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="lab-worker-command")
         self._future: Future[None] | None = None
+        self._pending_lease: WorkerCommandLease | None = None
         self._stop = Event()
 
     # --------------------------------------------------------------- lifecycle
@@ -162,12 +163,25 @@ class RealWorker:
             owned_pids=(),
             isolated=True,
             warnings=tuple(dict.fromkeys(warnings)),
+            serving=self.executor.serving.status(),
         )
         self.client.heartbeat(revision, health)
         self._last_heartbeat = time.monotonic()
 
     def _maybe_heartbeat(self) -> None:
         if time.monotonic() - self._last_heartbeat >= self.settings.heartbeat_seconds:
+            if self._pending_lease is not None:
+                lease = self._pending_lease
+                try:
+                    self.client.renew(
+                        command_id=lease.command.command_id,
+                        lease_token=lease.lease_token,
+                        lease_generation=lease.lease_generation,
+                    )
+                except WorkerClientError:
+                    # Never start a deferred command whose lease is no longer ours.
+                    self._pending_lease = None
+                    logger.warning("deferred command lease could not be renewed")
             self.heartbeat()
 
     # ---------------------------------------------------------------- commands
@@ -189,6 +203,7 @@ class RealWorker:
         try:
             completion = self.executor.execute(lease)
             self.client.complete(command_id=command.command_id, completion=completion)
+            self.heartbeat()
             self.processed += 1
             self._save_snapshot_state()
             logger.info(
@@ -214,7 +229,7 @@ class RealWorker:
         self._future = None
 
     def _is_lifecycle(self, lease: WorkerCommandLease) -> bool:
-        return lease.command.command_type in {CommandType.PAUSE, CommandType.CANCEL}
+        return lease.command.command_type in {CommandType.PAUSE, CommandType.CANCEL, CommandType.STOP_RECIPE}
 
     def process_lease_sync(self, lease: WorkerCommandLease) -> bool:
         try:
@@ -261,6 +276,9 @@ class RealWorker:
                 break
             iterations += 1
             self._finish_future()
+            if self._future is None and self._pending_lease is not None:
+                self._future = self._pool.submit(self._run_command, self._pending_lease)
+                self._pending_lease = None
             try:
                 response = self.client.poll(max_commands=1)
             except WorkerClientError:
@@ -273,13 +291,24 @@ class RealWorker:
                     elif self._future is None:
                         self._future = self._pool.submit(self._run_command, lease)
                     else:
-                        logger.warning(
-                            "worker busy; command lease left to expire and retry",
-                            extra={"command_id": lease.command.command_id},
-                        )
+                        # Completion may reach the controller just before this
+                        # thread finishes saving local state. Retain that next
+                        # lease instead of throwing it away until expiration.
+                        try:
+                            self.client.ack(
+                                command_id=lease.command.command_id,
+                                lease_token=lease.lease_token,
+                                lease_generation=lease.lease_generation,
+                                message="waiting for local command cleanup",
+                            )
+                        except WorkerClientError:
+                            logger.warning("deferred command could not be acknowledged")
+                        else:
+                            self._pending_lease = lease
             self._maybe_heartbeat()
-            if self._future is None:
-                stop_event.wait(self.settings.poll_seconds)
+            stop_event.wait(self.settings.poll_seconds)
+        self.executor._verification_stop.set()
+        self.executor.serving.stop()
         with self.executor._lock:
             for event in self.executor._active.values():
                 event.set()

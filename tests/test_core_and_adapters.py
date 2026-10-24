@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from lab_adapters import registry
 from lab_core import (
+    CandidateSpec,
     ContextLength,
     EngineId,
     GeneratedFile,
@@ -20,6 +21,7 @@ from lab_core import (
     RegisteredBinary,
     SandboxPaths,
     SearchSpaceRequest,
+    stable_id,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +49,43 @@ def test_request_is_immutable_and_digest_is_canonical() -> None:
         item.value = 2
     assert item.digest() == Example(value=1).digest()
     assert item.digest() != Example(value=2).digest()
+
+
+def _candidate(study_id: str, *, experiment_id: str = "exp-1") -> CandidateSpec:
+    return CandidateSpec(
+        study_id=study_id,
+        experiment_id=experiment_id,
+        trial_number=0,
+        engine_id="llamacpp",
+        engine_sha256="a" * 64,
+        model_digest="b" * 64,
+        worker_id="worker-1",
+        context=ContextLength.K4,
+        parameters={"threads": 8},
+        workload_digest="c" * 64,
+    )
+
+
+def test_candidate_identity_is_scoped_to_a_study_and_accepts_legacy_ids() -> None:
+    first = _candidate("study-1")
+    same_study = _candidate("study-1", experiment_id="exp-2")
+    other_study = _candidate("study-2")
+
+    assert same_study.candidate_id == first.candidate_id
+    assert other_study.candidate_id != first.candidate_id
+
+    legacy_id = stable_id(
+        "cand",
+        first.engine_id,
+        first.engine_sha256,
+        first.model_digest,
+        first.worker_id,
+        int(first.context),
+        first.workload_digest,
+        first.parameters,
+    )
+    restored = CandidateSpec.model_validate({**first.model_dump(mode="json"), "candidate_id": legacy_id})
+    assert restored.candidate_id == legacy_id
 
 
 def test_generated_file_requires_matching_digest_and_safe_path() -> None:

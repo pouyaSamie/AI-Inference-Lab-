@@ -75,6 +75,80 @@ def _mock_client(handler: httpx.MockTransport) -> httpx.Client:
     return httpx.Client(transport=handler, base_url="http://127.0.0.1:8080", trust_env=False)
 
 
+@pytest.mark.parametrize("engine_id,cached", [("llamacpp", 0), ("strata", 0), ("strata", 99)])
+def test_serving_requests_stream_usage_and_recomputes_prompts(monkeypatch, engine_id, cached):
+    import os
+
+    from lab_worker.config import WorkerSettings
+
+    from lab_worker import bench
+
+    original_client = httpx.Client
+    requests = []
+    resets = []
+
+    def handler(request):
+        if request.url.path in ("/v1/unload", "/v1/load"):
+            resets.append(request.url.path)
+            return httpx.Response(200, json={"status": "ok"})
+        if request.url.path == "/props":
+            return httpx.Response(200, json={"n_ctx": 4096})
+        assert request.url.path == "/v1/chat/completions"
+        body = json.loads(request.content)
+        requests.append(body)
+        events = [{"choices": [{"delta": {"content": "ok"}}]}]
+        if body.get("stream_options", {}).get("include_usage"):
+            events.append(
+                {
+                    "usage": {
+                        "prompt_tokens": 100,
+                        "completion_tokens": 2,
+                        "prompt_tokens_details": {"cached_tokens": cached},
+                    }
+                }
+            )
+        content = "".join("data: " + json.dumps(event) + "\n\n" for event in events)
+        return httpx.Response(200, content=content + "data: [DONE]\n\n")
+
+    monkeypatch.setattr(
+        bench.httpx,
+        "Client",
+        lambda **_: original_client(transport=httpx.MockTransport(handler), base_url="http://127.0.0.1:8080"),
+    )
+    monkeypatch.setattr(
+        bench,
+        "prepare_prompt",
+        lambda *_, **__: bench.PreparedPrompt(
+            text="synthetic fixture",
+            target_tokens=100,
+            measured_tokens=100,
+            method="test-tokenizer",
+            includes_template=True,
+        ),
+    )
+    result = bench.run_serving_workload(
+        WorkerSettings(),
+        port=8080,
+        model_name="fixture",
+        context_tokens=4096,
+        output_tokens=2,
+        target_input_tokens=100,
+        engine_id=engine_id,
+        gpu_uuid=None,
+        pid=os.getpid(),
+    )
+    assert result.prompt_tokens == 100
+    assert result.output_tokens == 2
+    if engine_id == "llamacpp":
+        assert requests[0]["cache_prompt"] is False
+        assert not resets
+    else:
+        assert resets == ["/v1/unload", "/v1/load"]
+    assert result.completed is (cached == 0)
+    if cached:
+        assert "cached prompt tokens" in result.error
+
+
 def test_llamacpp_tokenizer_uses_template_and_tokenize() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/apply-template":

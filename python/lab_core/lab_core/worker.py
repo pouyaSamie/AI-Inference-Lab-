@@ -8,6 +8,7 @@ from .base import AwareTimestamp, FrozenModel, Identifier, NonEmptyStr, NonNegat
 from .engine import EngineCapabilityManifest
 from .ids import sha256_hex
 from .model import ModelArtifact
+from .serving import ServingSession
 from .version import SCHEMA_VERSION, WORKER_PROTOCOL_VERSION
 
 
@@ -70,6 +71,7 @@ class WorkerHealth(FrozenModel):
     owned_pids: tuple[int, ...] = ()
     isolated: bool = True
     warnings: tuple[str, ...] = ()
+    serving: ServingSession | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class WorkerSnapshot(FrozenModel):

@@ -18,11 +18,13 @@ from .base import (
     Sha256,
     utcnow,
 )
+from .candidate import CandidateSpec
 from .engine import EngineIdentity
 from .enums import AckDisposition, CommandStatus, CommandType, ContextLength, FailureKind
 from .experiment import ContextFeasibility, WorkloadSuite
 from .model import ModelArtifact
 from .observation import BenchmarkObservation
+from .serving import RecipeChatRequest, ServingSession
 from .version import SCHEMA_VERSION, WORKER_PROTOCOL_VERSION
 from .worker import WorkerSnapshot
 
@@ -34,6 +36,7 @@ class ScanPayload(FrozenModel):
     include_models: bool = True
     include_hardware: bool = True
     hash_models: bool = False
+    model_id: Identifier | None = Field(default=None, exclude_if=lambda value: value is None)
     reason: str | None = None
 
 
@@ -107,6 +110,27 @@ class PromotePayload(FrozenModel):
     previous_recipe_id: Identifier | None = None
 
 
+class RunRecipePayload(FrozenModel):
+    command_type: Literal[CommandType.RUN_RECIPE] = CommandType.RUN_RECIPE
+    session_id: Identifier
+    recipe_id: Identifier
+    recipe_digest: Sha256
+    candidate: CandidateSpec
+    model: ModelArtifact
+    gpu_uuid: NonEmptyStr
+    profile_sha256: Sha256 | None = None
+    issued_at: AwareTimestamp = Field(default_factory=utcnow)
+
+
+class StopRecipePayload(FrozenModel):
+    command_type: Literal[CommandType.STOP_RECIPE] = CommandType.STOP_RECIPE
+    session_id: Identifier
+
+
+class RecipeChatPayload(RecipeChatRequest):
+    command_type: Literal[CommandType.RECIPE_CHAT] = CommandType.RECIPE_CHAT
+
+
 CommandPayload = Annotated[
     ScanPayload
     | PreflightPayload
@@ -114,7 +138,10 @@ CommandPayload = Annotated[
     | PausePayload
     | CancelPayload
     | VerifyRecipePayload
-    | PromotePayload,
+    | PromotePayload
+    | RunRecipePayload
+    | StopRecipePayload
+    | RecipeChatPayload,
     Field(discriminator="command_type"),
 ]
 
@@ -225,6 +252,23 @@ class PromoteResult(FrozenModel):
     message: str | None = None
 
 
+class RunRecipeResult(FrozenModel):
+    command_type: Literal[CommandType.RUN_RECIPE] = CommandType.RUN_RECIPE
+    session: ServingSession
+
+
+class StopRecipeResult(FrozenModel):
+    command_type: Literal[CommandType.STOP_RECIPE] = CommandType.STOP_RECIPE
+    session_id: Identifier
+    stopped: bool
+
+
+class RecipeChatResult(FrozenModel):
+    command_type: Literal[CommandType.RECIPE_CHAT] = CommandType.RECIPE_CHAT
+    session_id: Identifier
+    content: str = Field(max_length=32768)
+
+
 CommandResult = Annotated[
     ScanResult
     | PreflightResult
@@ -232,7 +276,10 @@ CommandResult = Annotated[
     | PauseResult
     | CancelResult
     | VerifyRecipeResult
-    | PromoteResult,
+    | PromoteResult
+    | RunRecipeResult
+    | StopRecipeResult
+    | RecipeChatResult,
     Field(discriminator="command_type"),
 ]
 
