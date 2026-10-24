@@ -23,7 +23,7 @@ try {
  const assert=async(name,expression)=>{if(!await evaluate(expression))throw Error(name);checks.push(name);};
  await evaluate("localStorage.setItem('lab.theme','light');location.href='lab://app/index.html?demo=1#/live'");await delay(200);await cmd('Page.reload');await delay(700);
  await evaluate("document.querySelector('[aria-label=\"Dark appearance\"]').focus()");await key('Enter','Enter');
- 
+
  await assert('Appearance icon supports keyboard activation and persistence',"document.documentElement.dataset.theme==='dark'&&localStorage.getItem('lab.theme')==='dark'");
  await evaluate("const select=document.querySelector('.page-header select');select.value='exp-demo-running';select.dispatchEvent(new Event('change',{bubbles:true}))");await delay(500);
  await evaluate("const cancel=[...document.querySelectorAll('.run-actions button')].find(b=>b.textContent==='Cancel');cancel.focus();cancel.click()");

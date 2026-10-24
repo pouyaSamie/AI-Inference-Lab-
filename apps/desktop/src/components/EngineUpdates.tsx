@@ -39,7 +39,7 @@ export function EngineUpdatesPanel() {
     {!status.releases.length && !status.checking ? <p className="muted">{status.checked_at ? "Add an inference folder to check its engines." : "Check releases to see available updates."}</p> : null}
     {status.releases.filter(release => release.engine_id === family).map(release => {
       const recommendation = release.recommendation;
-      const chosen = assets[release.engine_id] ?? recommendation?.asset_id ?? 0;
+      const chosen = assets[release.engine_id] ?? (installation?.phase === "complete" && installation.engine_id === release.engine_id ? installation.asset_id : recommendation?.asset_id) ?? 0;
       const asset = release.assets.find(item => item.id === chosen);
       const alreadyInstalled = installation?.phase === "complete" && installation.engine_id === release.engine_id && installation.asset_id === chosen;
       return <div className="engine-release" key={release.engine_id}>
