@@ -36,7 +36,6 @@ function Inventory({ api, workerId }: { api: PageProps["api"]; workerId: string 
       <Panel
         title="Installed engines"
         subtitle={`Snapshot revision ${data.revision} · observed capability manifests`}
-        actions={<button className="link-button" onClick={snapshot.refresh}>Refresh snapshot</button>}
       >
         {engines.length === 0 ? (
           <EmptyState
@@ -48,6 +47,7 @@ function Inventory({ api, workerId }: { api: PageProps["api"]; workerId: string 
             {engines.map((manifest) => (
               <button
                 key={manifest.engine.engine_id}
+                aria-pressed={selected?.engine.engine_id === manifest.engine.engine_id}
                 className={`engine-card ${selected?.engine.engine_id === manifest.engine.engine_id ? "selected" : ""}`}
                 onClick={() => setEngineId(manifest.engine.engine_id)}
               >
@@ -86,16 +86,16 @@ function Inventory({ api, workerId }: { api: PageProps["api"]; workerId: string 
               </ul>
             ) : null}
             <h3 className="subsection-title">Observed parameters ({selected.descriptors?.length ?? 0})</h3>
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
                 <thead>
                   <tr>
-                    <th>Key</th>
-                    <th>Kind</th>
-                    <th>Support</th>
-                    <th>Range / values</th>
-                    <th>Default</th>
-                    <th>Impact</th>
+                    <th scope="col">Key</th>
+                    <th scope="col">Kind</th>
+                    <th scope="col">Support</th>
+                    <th scope="col">Range / values</th>
+                    <th scope="col">Default</th>
+                    <th scope="col">Impact</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -151,8 +151,9 @@ export function EnginesPage({ api }: PageProps) {
           </label>
         }
       />
+      {!workers.data && !workers.error ? <Spinner label="Loading workers" /> : null}
       {workers.error ? <ErrorNotice error={workers.error} onRetry={workers.refresh} /> : null}
-      {workerId ? <Inventory key={workerId} api={api} workerId={workerId} /> : <Panel><EmptyState title="Select a worker" /></Panel>}
+      {workerId ? <Inventory key={workerId} api={api} workerId={workerId} /> : workers.data ? <Panel><EmptyState title="Select a worker" /></Panel> : null}
     </>
   );
 }

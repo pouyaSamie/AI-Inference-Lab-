@@ -21,27 +21,42 @@ import {
   Tabs,
 } from "../components/ui";
 import type { PageProps } from "./types";
+import { RecipeSession } from "../components/RecipeSession";
 
 type RecipeKind = {
   schema_version?: string;
   engine?: { id?: string; version?: string; build?: string; executable?: string; sha256?: string; source_commit?: string };
   model?: { id?: string; artifact_digest?: string; files?: { path?: string; sha256?: string; size_bytes?: number }[] };
-  hardware?: { gpu_model?: string; gpu_uuid?: string; min_vram_bytes?: number };
+  hardware?: { gpu_model?: string; gpu_uuid?: string; min_vram_bytes?: number; worker_id?: string };
   launch?: { executable?: string; argv?: string[]; env?: Record<string, string>; bind_host?: string };
-  constraints?: { require_full_context_proof?: boolean; min_improvement_pct?: number; confidence_level?: number };
-  validation?: { validated?: boolean; confidence_ref?: string; metrics_ref?: string };
+  context_tokens?: number;
+  validation?: { confidence_ref?: string; metrics_ref?: string; claim_scope?: string[]; validated_at?: string };
   notes?: string[];
 };
 
 type ExportFormat = "json" | "yaml" | "bash" | "systemd";
+const TERMINAL_COMMANDS = ["completed", "failed", "rejected", "expired", "cancelled"];
 
 function RecipeDetail({ api, view }: { api: PageProps["api"]; view: RecipeView }) {
   const recipe = view.recipe as RecipeKind;
   const [format, setFormat] = useState<ExportFormat>("json");
   const [verification, setVerification] = useState<Record<string, unknown> | null>(null);
-  const [promotion, setPromotion] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const verificationCommands = usePolling(
+    () => api.workerCommands(recipe.hardware?.worker_id ?? ""),
+    2_000,
+    typeof verification?.command_id === "string" && Boolean(recipe.hardware?.worker_id) &&
+      !TERMINAL_COMMANDS.includes(String(verification?.status)),
+  );
+  const verificationCommand = verificationCommands.data?.find(command => command.command_id === verification?.command_id);
+  const verificationPending = Boolean(verification && recipe.hardware?.worker_id &&
+    (!verificationCommand || !TERMINAL_COMMANDS.includes(verificationCommand.status)));
+  useEffect(() => {
+    if (verificationCommand && TERMINAL_COMMANDS.includes(verificationCommand.status)) {
+      setVerification({ command_id: verificationCommand.command_id, status: verificationCommand.status });
+    }
+  }, [verificationCommand]);
 
   const content = useMemo(() => {
     if (format === "json") return JSON.stringify(recipe, null, 2);
@@ -76,23 +91,6 @@ function RecipeDetail({ api, view }: { api: PageProps["api"]; view: RecipeView }
     }
   };
 
-  const promote = async (dryRun: boolean) => {
-    const slot = window.prompt("Target promotion slot (never written without explicit confirmation):", "active");
-    if (!slot) return;
-    if (!dryRun && !window.confirm(`Promote recipe ${view.recipe_id} to slot “${slot}”? This requests a guarded deployment command.`)) {
-      return;
-    }
-    setBusy(dryRun ? "dry-run" : "promote");
-    setError(null);
-    try {
-      setPromotion(await api.promoteRecipe(view.recipe_id, { target_slot: slot, dry_run: dryRun }));
-    } catch (caught) {
-      setError(caught);
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const files = recipe.model?.files ?? [];
 
   return (
@@ -114,16 +112,15 @@ function RecipeDetail({ api, view }: { api: PageProps["api"]; view: RecipeView }
               { label: "GPU", value: `${recipe.hardware?.gpu_model ?? "unknown"} · ${recipe.hardware?.gpu_uuid ?? "unknown"}` },
               { label: "Minimum VRAM", value: formatBytes(recipe.hardware?.min_vram_bytes) },
               { label: "Bind host", value: recipe.launch?.bind_host ?? "not recorded" },
-              { label: "Full-context proof", value: recipe.constraints?.require_full_context_proof ? "required" : "not required" },
-              { label: "Improvement gate", value: `${recipe.constraints?.min_improvement_pct ?? 5}%` },
-              { label: "Confidence", value: `${Math.round((recipe.constraints?.confidence_level ?? 0.95) * 100)}%` },
+              { label: "Context", value: recipe.context_tokens ? `${recipe.context_tokens.toLocaleString()} tokens` : "not recorded" },
+              { label: "Validated scope", value: recipe.validation?.claim_scope?.join(", ") || "See qualification evidence" },
               { label: "Experiment", value: view.experiment_id },
               { label: "Candidate", value: view.candidate_id },
               { label: "Confidence reference", value: <span className="mono wrap">{recipe.validation?.confidence_ref ?? "missing"}</span> },
               { label: "Metrics reference", value: <span className="mono wrap">{recipe.validation?.metrics_ref ?? "missing"}</span> },
             ]}
           />
-          {recipe.validation?.validated ? (
+          {view.status === "validated" ? (
             <Notice tone="ok" title="Recipe validation recorded">
               Qualification evidence is referenced by path and digest in the recipe record. Verification still re-checks
               installed binaries and artifacts; a recipe is not a license to skip checks.
@@ -142,9 +139,9 @@ function RecipeDetail({ api, view }: { api: PageProps["api"]; view: RecipeView }
 
         <Panel title="Model artifacts">
           {files.length === 0 ? <EmptyState title="No artifact files recorded" /> : (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
-                <thead><tr><th>Path</th><th>Size</th><th>SHA-256</th></tr></thead>
+                <thead><tr><th scope="col">Path</th><th scope="col">Size</th><th scope="col">SHA-256</th></tr></thead>
                 <tbody>
                   {files.map((file, index) => (
                     <tr key={`${file.path ?? index}`}>
@@ -161,6 +158,7 @@ function RecipeDetail({ api, view }: { api: PageProps["api"]; view: RecipeView }
       </div>
 
       <div className="stack">
+        <RecipeSession api={api} view={view} workerId={recipe.hardware?.worker_id} />
         <Panel
           title="Export"
           subtitle="Files are written only through the native save dialog after an explicit action."
@@ -174,44 +172,46 @@ function RecipeDetail({ api, view }: { api: PageProps["api"]; view: RecipeView }
             tabs={[
               { value: "json", label: "JSON" },
               { value: "yaml", label: "YAML" },
-              { value: "bash", label: "Bash" },
-              { value: "systemd", label: "systemd" },
+              ...(recipe.engine?.id === "strata" ? [] : [
+                { value: "bash" as const, label: "Bash" },
+                { value: "systemd" as const, label: "systemd" },
+              ]),
             ]}
             value={format}
             onChange={setFormat}
-          />
+            label="Recipe export format"
+          >
+          {recipe.engine?.id === "strata" ? <Notice tone="info" title="Use Run recipe to start Strata">
+            Strata needs its verified native profile as well as the launch arguments. The Lab generates it safely
+            when you run this recipe. These metadata exports are not standalone launch scripts.
+          </Notice> : null}
           <pre className="code-block">{content}</pre>
+          </Tabs>
           {error ? <ErrorNotice error={error} /> : null}
         </Panel>
 
-        <Panel title="Verification and promotion" subtitle="Both actions are explicit; neither runs automatically.">
+        <Panel title="Verify saved inputs" subtitle="Verification is explicit and never starts an engine.">
           <div className="button-row">
-            <button className="button button-secondary" onClick={verify} disabled={busy !== null || view.status !== "validated"}>
-              {busy === "verify" ? "Verifying…" : "Verify installation"}
-            </button>
-            <button className="button button-secondary" onClick={() => promote(true)} disabled={busy !== null || view.status !== "validated"}>
-              {busy === "dry-run" ? "Checking…" : "Promotion dry run"}
-            </button>
-            <button className="button button-danger" onClick={() => promote(false)} disabled={busy !== null || view.status !== "validated"}>
-              {busy === "promote" ? "Requesting…" : "Promote"}
+            <button className="button button-secondary" onClick={verify} disabled={busy !== null || verificationPending || view.status !== "validated"}>
+              {busy === "verify" || verificationPending ? "Verifying…" : "Verify installation"}
             </button>
           </div>
           <p className="muted">
-            Promotion is disabled for non-validated recipes by the controller. Verification checks the installed binary
+            Verification checks the installed binary
             and artifact hashes without downloading or replacing anything.
           </p>
           {verification ? (
             <div className="result-box">
               <strong>Verification result</strong>
-              <pre>{JSON.stringify(verification, null, 2)}</pre>
+              {verificationPending ? <p>Waiting for the worker to check the recipe identities.</p> : null}
+              <pre>{JSON.stringify(verificationCommand?.result ?? (verificationCommand ? {
+                command_id: verificationCommand.command_id,
+                status: verificationCommand.status,
+                failure_code: verificationCommand.failure?.kind,
+              } : verification), null, 2)}</pre>
             </div>
           ) : null}
-          {promotion ? (
-            <div className="result-box">
-              <strong>Promotion result</strong>
-              <pre>{JSON.stringify(promotion, null, 2)}</pre>
-            </div>
-          ) : null}
+          {verificationCommands.error ? <ErrorNotice error={verificationCommands.error} onRetry={verificationCommands.refresh} /> : null}
         </Panel>
 
         <Panel title="Launch plan" subtitle="Argv is shown as stored. The UI never rewrites engine flags.">
@@ -244,10 +244,9 @@ export function RecipesPage({ api, navigate }: PageProps) {
         eyebrow="Deployment artifacts"
         title="Recipes"
         description="Validated recipes are reproducible launch plans with hashes and evidence references. Simulated or unqualified evidence cannot reach this list."
-        actions={<button className="button button-secondary" onClick={recipes.refresh}>Refresh</button>}
       />
       {recipes.error ? <ErrorNotice error={recipes.error} onRetry={recipes.refresh} /> : null}
-      {!recipes.data ? <Spinner label="Loading recipes" /> : null}
+      {!recipes.data && !recipes.error ? <Spinner label="Loading recipes" /> : null}
       {recipes.data && recipes.data.recipes.length === 0 ? (
         <Panel>
           <EmptyState
@@ -282,8 +281,8 @@ export function RecipesPage({ api, navigate }: PageProps) {
           <li><strong>Finalize</strong><span>Paired samples and guardrails produce a validated winner or no winner.</span></li>
           <li><strong>Create recipe</strong><span>The controller records a content-addressed launch plan and evidence references.</span></li>
           <li><strong>Verify</strong><span>The worker confirms the installed executable and model artifact hashes.</span></li>
-          <li><strong>Dry-run promotion</strong><span>The controller checks the target slot without replacing anything.</span></li>
-          <li><strong>Promote</strong><span>Explicit operator confirmation is required. Deployment installation is Phase 8 and remains unimplemented.</span></li>
+          <li><strong>Run recipe</strong><span>The worker verifies files, reserves the GPU and starts a separate local engine. Stop it from this page.</span></li>
+          <li><strong>Use the model</strong><span>Chat here or connect a local application to the displayed endpoint. Existing external services are never replaced.</span></li>
         </ol>
         <p className="muted">
           No recipe is created from a simulated study. The UI displays the controller's status; it cannot override

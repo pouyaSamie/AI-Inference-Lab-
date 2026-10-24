@@ -1,7 +1,6 @@
+import { DataRows } from "../components/DataRows";
 import { useEffect, useMemo, useState } from "react";
 import type {
-  BenchmarkObservation,
-  CandidateSpec,
   ContextEvaluation,
   ExperimentResultsResponse,
 } from "../lib/contracts";
@@ -50,6 +49,8 @@ function classificationCopy(response: ExperimentResultsResponse): { title: strin
 }
 
 function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; experimentId: string; navigate: PageProps["navigate"] }) {
+  const provenance = usePolling(() => api.experiment(experimentId), 30_000);
+  const [context, setContext] = useState("all");
   const results = usePolling(() => api.results(experimentId), 15_000);
   const [recipeError, setRecipeError] = useState<unknown>(null);
   const [exportError, setExportError] = useState<unknown>(null);
@@ -70,7 +71,7 @@ function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; ex
     return `#${candidate.trial_number} ${candidate.role === "baseline" ? "baseline" : CONTEXT_LABELS[candidate.context]}`;
   };
 
-  const rangePoints = (finalization.per_context ?? []).flatMap((ranking) =>
+  const rangePoints = (finalization.per_context ?? []).filter(ranking => context === "all" || String(ranking.context) === context).flatMap((ranking) =>
     (ranking.evaluations ?? [])
       .filter((evaluation) => evaluation.score !== null && evaluation.score !== undefined)
       .map((evaluation) => ({
@@ -83,6 +84,7 @@ function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; ex
   );
 
   const scatterPoints = (response.observations ?? [])
+    .filter(observation => context === "all" || String(observation.context) === context)
     .filter((observation) => observation.metrics?.prefill_tokens_per_sec && observation.metrics?.decode_tokens_per_sec)
     .map((observation) => ({
       label: `#${observation.trial_number}`,
@@ -152,6 +154,15 @@ function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; ex
       {recipeError ? <ErrorNotice error={recipeError} onRetry={createRecipe} /> : null}
       {exportError ? <ErrorNotice error={exportError} onRetry={exportResults} /> : null}
 
+      <Panel title="Comparison provenance" subtitle="One saved experiment; unlike engine/model workloads are not combined.">
+        {provenance.data ? <dl className="key-values">
+          <div><dt>Engine / build</dt><dd>{provenance.data.spec.engine.engine_id} · {provenance.data.spec.engine.version} · {provenance.data.spec.engine.build}<br /><code>{provenance.data.spec.engine.executable_sha256}</code></dd></div>
+          <div><dt>Model / tokenizer / worker</dt><dd>{provenance.data.spec.model.model_id}<br />{provenance.data.spec.model.tokenizer_id ?? "Tokenizer not observed"}<br /><code>{provenance.data.spec.model.files?.[0]?.sha256 ?? "Model file hash unavailable"}</code><br />{provenance.data.status.worker_id}</dd></div>
+          <div><dt>Dataset SHA-256</dt><dd><code>{provenance.data.spec.workload?.dataset_sha256 ?? "Dataset hash not recorded"}</code></dd></div>
+          <div><dt>Plan / objective</dt><dd><code>{provenance.data.plan.plan_id}</code><br />{provenance.data.status.objective}</dd></div>
+        </dl> : <p className="muted">{provenance.error ? "Provenance unavailable. Do not infer comparability with another experiment." : "Loading immutable provenance…"}</p>}
+        <label className="field-inline">Plot context<select value={context} onChange={event => setContext(event.target.value)}><option value="all">All retained contexts (separate observations)</option>{(provenance.data?.spec.contexts ?? []).map(value => <option key={value} value={value}>{CONTEXT_LABELS[value]}</option>)}</select></label>
+      </Panel>
       <div className="grid-2">
         <Panel title="Paired objective ratio" subtitle="Points above 1.0 beat their same-context baseline. Bars are confidence intervals.">
           <ChartFrame title="Ratio by evaluation">
@@ -179,25 +190,24 @@ function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; ex
           {(ranking.evaluations ?? []).length === 0 ? (
             <EmptyState title="No paired evaluations" detail="This context was selected but has no eligible paired baseline/candidate samples." />
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
                 <thead>
                   <tr>
-                    <th>Candidate</th>
-                    <th>Score</th>
-                    <th>Improvement</th>
-                    <th>Paired interval</th>
-                    <th>Status</th>
-                    <th>Samples (base / cand)</th>
-                    <th>Reasons</th>
+                    <th scope="col">Candidate</th>
+                    <th scope="col" className="numeric">Score</th>
+                    <th scope="col" className="numeric">Improvement</th>
+                    <th scope="col">Paired interval</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Samples (base / cand)</th>
+                    <th scope="col">Reasons</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {(ranking.evaluations ?? []).map((evaluation) => (
+                <DataRows items={(ranking.evaluations ?? [])} columns={7} label="evaluations" getOrder={item => item.score}>{(evaluation) => (
                     <tr key={`${ranking.context}-${evaluation.candidate_id}`} className={evaluation.qualified ? "row-ok" : ""}>
                       <td><strong>{label(evaluation.candidate_id)}</strong><small>{shortId(evaluation.candidate_id, 20)}</small></td>
-                      <td>{evaluation.score === null || evaluation.score === undefined ? "—" : evaluation.score.toFixed(4)}</td>
-                      <td>{formatDelta(evaluation.improvement_pct)}</td>
+                      <td className="numeric">{evaluation.score === null || evaluation.score === undefined ? "—" : evaluation.score.toFixed(4)}</td>
+                      <td className="numeric">{formatDelta(evaluation.improvement_pct)}</td>
                       <td className="mono">{confidenceText(evaluation)}</td>
                       <td><Badge tone={evaluationTone(evaluation)}>{evaluation.status ?? "unknown"}</Badge></td>
                       <td>{evaluation.baseline_samples ?? 0} / {evaluation.candidate_samples ?? 0}</td>
@@ -209,8 +219,7 @@ function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; ex
                         ) : "—"}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
+                  )}</DataRows>
               </table>
             </div>
           )}
@@ -224,21 +233,19 @@ function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; ex
         {!finalization.cross_context?.length ? (
           <EmptyState title="No cross-context ranking" detail="Per-context mode does not claim a global winner." />
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
             <table>
-              <thead><tr><th>Candidate</th><th>Coverage</th><th>Aggregate score</th><th>Per-context scores</th><th>Qualified</th><th>Reasons</th></tr></thead>
-              <tbody>
-                {finalization.cross_context.map((ranking) => (
+              <thead><tr><th scope="col">Candidate</th><th scope="col">Coverage</th><th scope="col" className="numeric">Aggregate score</th><th scope="col">Per-context scores</th><th scope="col">Qualified</th><th scope="col">Reasons</th></tr></thead>
+              <DataRows items={finalization.cross_context} columns={6} label="rankings" getOrder={item => item.score}>{(ranking) => (
                   <tr key={ranking.candidate_id}>
                     <td><strong>{label(ranking.candidate_id)}</strong></td>
                     <td>{ranking.complete_coverage ? "complete" : "incomplete"} ({(ranking.contexts ?? []).map((context) => CONTEXT_LABELS[context]).join(", ") || "none"})</td>
-                    <td>{ranking.score.toFixed(4)}</td>
+                    <td className="numeric">{ranking.score.toFixed(4)}</td>
                     <td className="mono">{(ranking.per_context_scores ?? []).map((score) => score.toFixed(3)).join(" · ") || "—"}</td>
                     <td><Badge tone={ranking.qualified ? "ok" : "warn"}>{ranking.qualified ? "qualified" : "ineligible"}</Badge></td>
                     <td>{(ranking.reasons ?? []).length ? (ranking.reasons ?? []).join(", ") : "—"}</td>
                   </tr>
-                ))}
-              </tbody>
+                )}</DataRows>
             </table>
           </div>
         )}
@@ -248,26 +255,24 @@ function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; ex
         {(response.observations ?? []).length === 0 ? (
           <EmptyState title="No observations" />
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
             <table>
-              <thead><tr><th>Trial</th><th>Context</th><th>Prefill</th><th>Decode</th><th>TTFT</th><th>Peak VRAM</th><th>Samples</th><th>Measurement</th></tr></thead>
-              <tbody>
-                {(response.observations ?? []).map((observation: BenchmarkObservation) => (
+              <thead><tr><th scope="col">Trial</th><th scope="col">Context</th><th scope="col" className="numeric">Prefill</th><th scope="col" className="numeric">Decode</th><th scope="col" className="numeric">TTFT</th><th scope="col" className="numeric">Peak VRAM</th><th scope="col" className="numeric">Samples</th><th scope="col">Measurement</th></tr></thead>
+              <DataRows items={(response.observations ?? [])} columns={8} label="observations" getOrder={item => item.trial_number}>{(observation) => (
                   <tr key={observation.observation_id}>
                     <td>{observation.trial_number}</td>
                     <td>{CONTEXT_LABELS[observation.context]}</td>
-                    <td>{metric(observation.metrics?.prefill_tokens_per_sec, " tok/s")}</td>
-                    <td>{metric(observation.metrics?.decode_tokens_per_sec, " tok/s")}</td>
-                    <td>{metric(observation.metrics?.time_to_first_token_ms, " ms")}</td>
-                    <td>{formatBytes(observation.metrics?.gpu_vram_peak_bytes)}</td>
-                    <td>{observation.samples?.length ?? 0}</td>
+                    <td className="numeric">{metric(observation.metrics?.prefill_tokens_per_sec, " tok/s")}</td>
+                    <td className="numeric">{metric(observation.metrics?.decode_tokens_per_sec, " tok/s")}</td>
+                    <td className="numeric">{metric(observation.metrics?.time_to_first_token_ms, " ms")}</td>
+                    <td className="numeric">{formatBytes(observation.metrics?.gpu_vram_peak_bytes)}</td>
+                    <td className="numeric">{observation.samples?.length ?? 0}</td>
                     <td>
                       <Badge tone={observation.simulated ? "simulated" : "info"}>{observation.measurement_status}</Badge>
                       <small>{observation.evidence_kind}</small>
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                )}</DataRows>
             </table>
           </div>
         )}
@@ -275,11 +280,10 @@ function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; ex
 
       <Panel title="Candidate provenance">
         {candidates.length === 0 ? <EmptyState title="No candidates" /> : (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
             <table>
-              <thead><tr><th>Trial</th><th>Role</th><th>Context</th><th>State</th><th>Parameters</th><th>Candidate ID</th></tr></thead>
-              <tbody>
-                {candidates.map((candidate: CandidateSpec) => (
+              <thead><tr><th scope="col">Trial</th><th scope="col">Role</th><th scope="col">Context</th><th scope="col">State</th><th scope="col">Parameters</th><th scope="col">Candidate ID</th></tr></thead>
+              <DataRows items={candidates} columns={6} label="candidates" getOrder={item => item.trial_number}>{(candidate) => (
                   <tr key={candidate.candidate_id}>
                     <td>{candidate.trial_number}</td>
                     <td><Badge tone={candidate.role === "baseline" ? "info" : "neutral"}>{candidate.role ?? "candidate"}</Badge></td>
@@ -288,8 +292,7 @@ function Comparison({ api, experimentId, navigate }: { api: PageProps["api"]; ex
                     <td className="mono wrap small">{JSON.stringify(candidate.parameters)}</td>
                     <td className="mono small">{shortId(candidate.candidate_id, 24)}</td>
                   </tr>
-                ))}
-              </tbody>
+                )}</DataRows>
             </table>
           </div>
         )}
@@ -341,7 +344,7 @@ export function ComparePage({
       />
       {experimentsError ? <ErrorNotice error={experimentsError} onRetry={refreshShell} /> : null}
       {choosable.length === 0 ? (
-        <Panel><EmptyState title="No results yet" detail="Start an experiment first; finalization is only available after evidence is retained." /></Panel>
+        <Panel><EmptyState title={experimentsError ? "Result history unavailable" : "No results yet"} detail={experimentsError ? "Reconnect to retrieve persisted results. No run outcome is inferred from this error." : "Start an experiment first; finalization is only available after evidence is retained."} /></Panel>
       ) : selected ? (
         <Comparison key={selected} api={api} experimentId={selected} navigate={navigate} />
       ) : (

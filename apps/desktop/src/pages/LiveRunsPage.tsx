@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { DataRows } from "../components/DataRows";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ExperimentView, JobEvent, WorkerSnapshot } from "../lib/contracts";
 import { CONTEXT_LABELS, STAGES } from "../lib/contracts";
 import type { EventPage } from "../lib/contracts";
@@ -13,10 +14,12 @@ import {
 } from "../lib/format";
 import {
   Badge,
+  RefreshButton,
   EmptyState,
   ErrorNotice,
   KeyValues,
   Notice,
+  Modal,
   PageHeader,
   Panel,
   SimulationBanner,
@@ -26,6 +29,13 @@ import {
 import type { PageProps } from "./types";
 
 type EventConnection = "connecting" | "live" | "disconnected" | "gap";
+
+function trialFailureSummary(kind: string): string {
+  if (kind === "EXTERNAL_GPU_CONTENTION") return "Other applications are using the GPU. No performance measurement was taken. Start a new test when the GPU is quiet.";
+  if (["INSUFFICIENT_VRAM", "INSUFFICIENT_RAM", "OOM"].includes(kind)) return "The test exceeded available memory. Choose a smaller model or context before starting a new test.";
+  if (kind === "CANCELLED") return "This trial was cancelled before a valid measurement completed.";
+  return `This trial did not produce a valid measurement: ${humanEnum(kind)}.`;
+}
 
 function mergeEvent(current: JobEvent[], next: JobEvent): JobEvent[] {
   if (current.some((event) => event.event_id === next.event_id)) return current;
@@ -171,11 +181,18 @@ function RunDetail({
     if (!workerId) return null;
     return api.workerSnapshot(workerId);
   }, 20_000);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorWidth, setInspectorWidth] = useState(320);
+  const [trialFilter, setTrialFilter] = useState("");
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [events, setEvents] = useState<JobEvent[]>([]);
   const [connection, setConnection] = useState<EventConnection>("connecting");
   const [eventError, setEventError] = useState<unknown>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const actionInFlight = useRef(false);
   const lastEventId = useRef(0);
   const view = viewPoll.data;
 
@@ -235,31 +252,53 @@ function RunDetail({
 
   const sortedCandidates = useMemo(() => view?.candidates ?? [], [view?.candidates]);
   const observations = view?.observations ?? [];
+  const selectedCandidate = sortedCandidates.find(item => item.candidate_id === selectedCandidateId) ?? sortedCandidates[0];
+  const selectedObservation = observations.find(item => item.candidate_id === selectedCandidate?.candidate_id);
 
   const act = async (name: string, action: () => Promise<unknown>) => {
+    if (actionInFlight.current) return false;
+    actionInFlight.current = true;
     setBusy(name);
     setActionError(null);
     try {
       await action();
       viewPoll.refresh();
       refreshShell();
+      return true;
     } catch (error) {
       setActionError(error);
+      return false;
     } finally {
+      actionInFlight.current = false;
       setBusy(null);
     }
   };
 
   if (viewPoll.loading && !view) return <Spinner label="Loading experiment" />;
-  if (viewPoll.error) return <ErrorNotice error={viewPoll.error} onRetry={viewPoll.refresh} />;
+  if (viewPoll.error && !view) return <ErrorNotice error={viewPoll.error} onRetry={viewPoll.refresh} />;
   if (!view) return <EmptyState title="Experiment unavailable" />;
 
   const status = view.status;
   const active = !["completed", "failed", "cancelled", "blocked"].includes(status.state);
   const snapshot: WorkerSnapshot | null = snapshotPoll.data;
+  const matches = (id: string | undefined, trial: number) => `${id ?? ""} ${trial}`.toLowerCase().includes(trialFilter.toLowerCase().trim());
+  const visibleCandidates = sortedCandidates.filter(item => matches(item.candidate_id, item.trial_number));
+  const visibleObservations = observations.filter(item => matches(item.candidate_id, item.trial_number));
 
   return (
     <>
+      {cancelOpen ? <Modal title="Cancel this test?" busy={busy !== null} onClose={() => setCancelOpen(false)}>
+        <p>The controller will stop this test's owned work safely. Your saved study will remain available.</p>
+        <form onSubmit={event => {
+          event.preventDefault();
+          if (busy !== null) return;
+          void act("cancel", () => api.cancel(experimentId, cancelReason.trim() || "operator cancelled from desktop UI")).then(ok => { if (ok) setCancelOpen(false); });
+        }}>
+          <label className="field">Reason (optional)<textarea maxLength={500} disabled={busy !== null || Boolean(viewPoll.error)} value={cancelReason} onChange={e => setCancelReason(e.target.value)} /></label>
+          {actionError ? <ErrorNotice error={actionError} /> : null}
+          <div className="button-row"><button type="button" className="button button-secondary" disabled={busy !== null || Boolean(viewPoll.error)} onClick={() => setCancelOpen(false)}>Keep running</button><button type="submit" className="button button-danger" disabled={busy !== null || Boolean(viewPoll.error)}>{busy === "cancel" ? "Cancelling…" : "Cancel test"}</button></div>
+        </form>
+      </Modal> : null}
       <div className="run-heading">
         <div>
           <span className="eyebrow">{shortId(status.experiment_id, 28)}</span>
@@ -273,27 +312,26 @@ function RunDetail({
           <StatusBadge value={status.state} />
           <Badge tone={status.paused ? "warn" : "info"}>{status.paused ? "Paused" : "Scheduler owned"}</Badge>
           {status.state === "running" ? (
-            <button className="button button-secondary" disabled={busy !== null} onClick={() => act("pause", () => api.pause(experimentId))}>
+            <button className="button button-secondary" disabled={busy !== null || Boolean(viewPoll.error)} onClick={() => act("pause", () => api.pause(experimentId))}>
               {busy === "pause" ? "Pausing…" : "Pause"}
             </button>
           ) : null}
           {status.state === "paused" ? (
-            <button className="button button-primary" disabled={busy !== null} onClick={() => act("resume", () => api.resume(experimentId))}>
+            <button className="button button-primary" disabled={busy !== null || Boolean(viewPoll.error)} onClick={() => act("resume", () => api.resume(experimentId))}>
               {busy === "resume" ? "Resuming…" : "Resume"}
             </button>
           ) : null}
-          {status.state === "preflight_required" ? (
-            <button className="button button-secondary" disabled={busy !== null} onClick={() => act("retry", () => api.retryPreflight(experimentId))}>
+          {status.state === "blocked" && status.stage === "preflight" ? (
+            <button className="button button-secondary" disabled={busy !== null || Boolean(viewPoll.error)} onClick={() => act("retry", () => api.retryPreflight(experimentId))}>
               {busy === "retry" ? "Queueing…" : "Retry preflight"}
             </button>
           ) : null}
           {active ? (
             <button
               className="button button-danger"
-              disabled={busy !== null}
+              disabled={busy !== null || Boolean(viewPoll.error)}
               onClick={() => {
-                const reason = window.prompt("Cancellation reason (stored in the audit trail):", "operator cancelled from desktop UI");
-                if (reason) void act("cancel", () => api.cancel(experimentId, reason));
+                setActionError(null); setCancelReason(""); setCancelOpen(true);
               }}
             >
               {busy === "cancel" ? "Cancelling…" : "Cancel"}
@@ -302,12 +340,19 @@ function RunDetail({
         </div>
       </div>
 
+      {viewPoll.error ? <Notice tone="warn" title="Last known run state — refresh failed">
+        Last successful response: {formatTimestamp(viewPoll.lastSuccessAt)}. This connection error does not indicate a failed or stopped run. Controls are disabled until a fresh response arrives.
+        <ErrorNotice error={viewPoll.error} onRetry={viewPoll.refresh} />
+      </Notice> : null}
       <SimulationBanner simulated={view.simulation ?? false} warnings={view.warnings ?? []} />
+      {status.state === "completed" && observations.length > 0 && observations.every(item => !["measured", "screening_only", "simulated"].includes(item.measurement_status)) ? (
+        <Notice tone="warn" title="Finished without valid measurements">The study is saved, but usable measurements are missing. Completed means processing finished; this is not a successful benchmark. See the trial reasons below.</Notice>
+      ) : null}
       {actionError ? <ErrorNotice error={actionError} /> : null}
       {eventError ? (
         <Notice tone="warn" title="Event stream needs resync">
           <p>{eventError instanceof Error ? eventError.message : "The event stream disconnected."}</p>
-          <button className="link-button" onClick={() => { viewPoll.refresh(); setEventError(null); }}>Refresh snapshot</button>
+          <RefreshButton label="Refresh run snapshot" onClick={() => { viewPoll.refresh(); setEventError(null); }} />
         </Notice>
       ) : null}
       {connection === "gap" ? (
@@ -336,6 +381,7 @@ function RunDetail({
         {status.error_message ? (
           <Notice tone="danger" title={status.error_code ?? "Experiment error"}>{status.error_message}</Notice>
         ) : null}
+        {snapshotPoll.error ? <Notice tone="warn" title="Worker snapshot refresh unavailable">Cached hardware may be stale. No live telemetry is inferred.</Notice> : null}
         {snapshot ? (
           <p className="muted">
             Worker telemetry: {snapshot.hardware.gpus?.map((gpu) => `${gpu.name} (${formatBytes(gpu.vram_total_bytes)} VRAM)`).join(", ") || "no GPU reported"}.
@@ -344,57 +390,92 @@ function RunDetail({
         ) : null}
       </Panel>
 
-      <div className="grid-2">
+      <div className="evidence-toolbar">
+        <label className="field-inline">Find trial<input type="search" placeholder="Trial number or candidate ID" value={trialFilter} onChange={event => setTrialFilter(event.target.value)} /></label>
+        <button className="button button-secondary" aria-expanded={inspectorOpen} aria-controls="trial-inspector" onClick={() => setInspectorOpen(!inspectorOpen)}>{inspectorOpen ? "Hide inspector" : "Show inspector"}</button>
+        {inspectorOpen ? <label className="inspector-size">Inspector width<input type="range" min={280} max={420} step={20} value={inspectorWidth} aria-valuetext={`${inspectorWidth} pixels`} onChange={event => setInspectorWidth(Number(event.target.value))} /></label> : null}
+      </div>
+      <div className={`run-workspace ${inspectorOpen ? "" : "inspector-closed"}`} style={{"--inspector-width": `${inspectorWidth}px`} as CSSProperties}>
+      <div className="run-trials">
+      <div className="grid-2 run-evidence-grid">
         <Panel title="Candidates" subtitle="Parameters come from the immutable candidate records.">
-          {sortedCandidates.length === 0 ? (
-            <EmptyState title="No candidates yet" detail="The optimizer asks for a paired baseline before TPE candidates." />
+          {visibleCandidates.length === 0 ? (
+            <EmptyState title={trialFilter ? "No matching candidates" : "No candidates yet"} detail={trialFilter ? "Clear the trial filter to see all retained candidates." : "The optimizer asks for a paired baseline before TPE candidates."} />
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
-                <thead><tr><th>Trial</th><th>Role</th><th>Context</th><th>State</th><th>Parameters</th></tr></thead>
-                <tbody>
-                  {sortedCandidates.map((candidate) => (
-                    <tr key={candidate.candidate_id}>
-                      <td>{candidate.trial_number}</td>
+                <thead><tr><th scope="col">Trial</th><th scope="col">Role</th><th scope="col">Context</th><th scope="col">State</th><th scope="col">Parameters</th></tr></thead>
+                <DataRows items={visibleCandidates} columns={5} label="candidates" getOrder={item => item.trial_number}>{(candidate) => (
+                    <tr key={candidate.candidate_id} className={candidate.candidate_id === selectedCandidate?.candidate_id ? "selected" : ""}>
+                      <td><button className="link-button" aria-pressed={candidate.candidate_id === selectedCandidate?.candidate_id} onClick={() => { setSelectedCandidateId(candidate.candidate_id ?? null); setInspectorOpen(true); }}>Trial {candidate.trial_number}</button></td>
                       <td><Badge tone={candidate.role === "baseline" ? "info" : "neutral"}>{candidate.role ?? "candidate"}</Badge></td>
                       <td>{CONTEXT_LABELS[candidate.context]}</td>
-                      <td><StatusBadge value={candidate.state} /></td>
-                      <td><span className="mono wrap small">{JSON.stringify(candidate.parameters)}</span></td>
+                      <td><StatusBadge value={observations.find(item => item.candidate_id === candidate.candidate_id)?.status ?? candidate.state} /></td>
+                      <td><details><summary>View parameters</summary><pre className="mono wrap small">{JSON.stringify(candidate.parameters, null, 2)}</pre></details></td>
                     </tr>
-                  ))}
-                </tbody>
+                  )}</DataRows>
               </table>
             </div>
           )}
         </Panel>
 
         <Panel title="Retained samples" subtitle="Finalization uses paired primary-level samples, not just averages.">
-          {observations.length === 0 ? (
-            <EmptyState title="No observations" detail="Observations appear after a candidate completes its workload." />
+          {observations.filter(item => item.failure || item.measurement_status === "unavailable").length > 10 ? <p className="muted">Showing up to 10 notices per failure type. Every retained trial remains available in the paged table and inspector.</p> : null}
+          {observations.filter(item => item.failure).slice(0, 10).map(item => <Notice key={item.observation_id} tone="warn" title={`Trial ${item.trial_number} did not complete`}>
+            <p>{trialFailureSummary(item.failure!.kind)}</p>
+            <details><summary>Failure code</summary><code>{item.failure!.kind}</code>{item.failure!.process_exit_code != null ? <p>Process exit: {item.failure!.process_exit_code}</p> : null}</details>
+          </Notice>)}
+          {observations.filter(item => !item.failure && item.measurement_status === "unavailable").slice(0, 10).map(item => <Notice key={`unavailable-${item.observation_id}`} tone="warn" title={`Trial ${item.trial_number}: measurements unavailable`}>
+            <p>The engine finished, but it did not return the answer text or timing data needed to measure performance. This trial cannot qualify a recipe.</p>
+          </Notice>)}
+          {visibleObservations.length === 0 ? (
+            <EmptyState title={trialFilter ? "No matching observations" : "No observations"} detail="Observations appear after a candidate completes its workload. Clear filters to see all retained records." />
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
-                <thead><tr><th>Trial</th><th>Evidence</th><th>Prefill</th><th>Decode</th><th>TTFT</th><th>VRAM</th><th>Samples</th></tr></thead>
-                <tbody>
-                  {observations.map((observation) => (
+                <thead><tr><th scope="col">Trial</th><th scope="col">Evidence</th><th scope="col" className="numeric">Prefill</th><th scope="col" className="numeric">Decode</th><th scope="col" className="numeric">TTFT</th><th scope="col" className="numeric">VRAM</th><th scope="col" className="numeric">Samples</th></tr></thead>
+                <DataRows items={visibleObservations} columns={7} label="observations" getOrder={item => item.trial_number}>{(observation) => (
                     <tr key={observation.observation_id}>
                       <td>{observation.trial_number}</td>
                       <td>
                         <Badge tone={observation.simulated ? "simulated" : "info"}>{observation.evidence_kind}</Badge>
-                        <small>{observation.measurement_status}</small>
+                        <small>{observation.measurement_status}</small>{observation.failure ? <small>{observation.failure.kind}</small> : null}
                       </td>
-                      <td>{metric(observation.metrics?.prefill_tokens_per_sec, " tok/s")}</td>
-                      <td>{metric(observation.metrics?.decode_tokens_per_sec, " tok/s")}</td>
-                      <td>{metric(observation.metrics?.time_to_first_token_ms, " ms")}</td>
-                      <td>{formatBytes(observation.metrics?.gpu_vram_peak_bytes)}</td>
-                      <td>{observation.samples?.length ?? 0}</td>
+                      <td className="numeric">{metric(observation.metrics?.prefill_tokens_per_sec, " tok/s")}</td>
+                      <td className="numeric">{metric(observation.metrics?.decode_tokens_per_sec, " tok/s")}</td>
+                      <td className="numeric">{metric(observation.metrics?.time_to_first_token_ms, " ms")}</td>
+                      <td className="numeric">{formatBytes(observation.metrics?.gpu_vram_peak_bytes)}</td>
+                      <td className="numeric">{observation.samples?.length ?? 0}</td>
                     </tr>
-                  ))}
-                </tbody>
+                  )}</DataRows>
               </table>
             </div>
           )}
         </Panel>
+      </div>
+
+      </div>
+      {inspectorOpen ? <aside id="trial-inspector" className="trial-inspector" aria-label="Selected trial inspector">
+        <Panel title={selectedCandidate ? `Trial ${selectedCandidate.trial_number}` : "Trial inspector"} subtitle="Immutable controller evidence">
+          {selectedCandidate ? <>
+            <StatusBadge value={selectedObservation?.status ?? selectedCandidate.state} />
+            <KeyValues items={[
+              { label: "Candidate", value: <code>{selectedCandidate.candidate_id}</code> },
+              { label: "Context", value: `${CONTEXT_LABELS[selectedCandidate.context]} tokens` },
+              { label: "Role", value: selectedCandidate.role ?? "candidate" },
+              { label: "Measurement", value: selectedObservation?.measurement_status ?? "No observation" },
+              { label: "Prefill", value: metric(selectedObservation?.metrics?.prefill_tokens_per_sec, " tok/s") },
+              { label: "Decode", value: metric(selectedObservation?.metrics?.decode_tokens_per_sec, " tok/s") },
+              { label: "TTFT", value: metric(selectedObservation?.metrics?.time_to_first_token_ms, " ms") },
+              { label: "Peak VRAM", value: formatBytes(selectedObservation?.metrics?.gpu_vram_peak_bytes) },
+            ]} />
+            {selectedObservation?.failure ? <Notice tone="warn" title={selectedObservation.failure.kind}>{trialFailureSummary(selectedObservation.failure.kind)}</Notice> : null}
+            <h3 className="subsection-title">Effective parameters</h3>
+            <pre className="mono">{JSON.stringify(selectedCandidate.parameters, null, 2)}</pre>
+            <p className="muted">{view.simulation ? "Simulated fixture evidence. Cannot qualify a recipe." : "Retained observation summary. Qualification requires paired samples and guardrails."}</p>
+          </> : <EmptyState title="Awaiting candidates" detail="Select a trial when controller records are available." />}
+        </Panel>
+      </aside> : null}
       </div>
 
       {["completed", "failed", "cancelled"].includes(status.state) ? (
@@ -422,15 +503,15 @@ function RunDetail({
           />
           <h3 className="subsection-title">Feasibility</h3>
           {view.feasibility?.length ? (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
-                <thead><tr><th>Context</th><th>Status</th><th>Estimated VRAM</th><th>Reason</th></tr></thead>
+                <thead><tr><th scope="col">Context</th><th scope="col">Status</th><th scope="col">Estimated VRAM</th><th scope="col">Reason</th></tr></thead>
                 <tbody>
                   {view.feasibility.map((item) => (
                     <tr key={item.context}>
                       <td>{CONTEXT_LABELS[item.context]}</td>
                       <td><StatusBadge value={item.status} /></td>
-                      <td>{formatBytes(item.estimated_vram_bytes)}</td>
+                      <td className="numeric">{formatBytes(item.estimated_vram_bytes)}</td>
                       <td>{item.reason ?? item.evidence?.[0] ?? "—"}</td>
                     </tr>
                   ))}
@@ -469,7 +550,7 @@ export function LiveRunsPage({
       <PageHeader
         eyebrow="Independent execution"
         title="Live Runs"
-        description="Stage, trial, telemetry and event history live in the controller. This view can reconnect or close without affecting the job."
+        description="Stage, trials and event history are retained by the controller. Minimize to keep desktop-managed local work running; Quit stops the local lab. Independent services continue separately."
         actions={
           <label className="field-inline">
             <span>Experiment</span>
@@ -488,8 +569,8 @@ export function LiveRunsPage({
       {list.length === 0 ? (
         <Panel>
           <EmptyState
-            title="No experiments"
-            detail="Create an immutable experiment from Optimize. The UI never starts a benchmark directly."
+            title={experimentsError ? "Run history unavailable" : "No experiments"}
+            detail={experimentsError ? "Reconnect to retrieve controller records. This connection error does not indicate that any run failed or stopped." : "Create an immutable experiment from Optimize. The UI never starts a benchmark directly."}
             action={<button className="button button-primary" onClick={() => navigate("optimize")}>Open Optimize</button>}
           />
         </Panel>

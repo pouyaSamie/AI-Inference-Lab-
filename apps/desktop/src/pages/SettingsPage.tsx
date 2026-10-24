@@ -1,4 +1,7 @@
+import { ResetDataPanel } from "../components/ResetData";
+import { EngineUpdatesPanel } from "../components/EngineUpdates";
 import { useEffect, useState } from "react";
+import { LocalRuntimePanel, useLocalRuntime } from "../components/LocalRuntime";
 import type { BridgeSettingsStatus } from "../lib/bridge";
 import { humanEnum } from "../lib/format";
 import { Badge, ErrorNotice, KeyValues, Notice, PageHeader, Panel, Spinner } from "../components/ui";
@@ -9,7 +12,9 @@ interface SettingsPageProps extends PageProps {
   onDemoChange: (enabled: boolean) => void;
 }
 
-export function SettingsPage({ api, demoEnabled, onDemoChange }: SettingsPageProps) {
+export function SettingsPage({ api, status, demoEnabled, onDemoChange }: SettingsPageProps) {
+  const managed = useLocalRuntime();
+  const [followSystem, setFollowSystem] = useState(() => (localStorage.getItem("lab.theme") ?? "system") === "system");
   const [bridge, setBridge] = useState<BridgeSettingsStatus | null>(null);
   const [appInfo, setAppInfo] = useState<{ version: string; platform: string; packaged: boolean; security?: Record<string, unknown> } | null>(null);
   const [apiUrl, setApiUrl] = useState("");
@@ -19,6 +24,11 @@ export function SettingsPage({ api, demoEnabled, onDemoChange }: SettingsPagePro
   const [busy, setBusy] = useState<string | null>(null);
   const [connection, setConnection] = useState<{ ok: boolean; detail: string } | null>(null);
 
+  useEffect(() => {
+    const update = () => setFollowSystem((localStorage.getItem("lab.theme") ?? "system") === "system");
+    window.addEventListener("lab:appearance-changed", update);
+    return () => window.removeEventListener("lab:appearance-changed", update);
+  }, []);
   useEffect(() => {
     let stopped = false;
     void api
@@ -89,12 +99,20 @@ export function SettingsPage({ api, demoEnabled, onDemoChange }: SettingsPagePro
         actions={<Badge tone={demoEnabled ? "simulated" : "info"}>{demoEnabled ? "Offline demo" : "Live backend"}</Badge>}
       />
 
+      <Panel title="Appearance" subtitle="The header toggle switches between light and dark.">
+        <label className="checkbox-row"><input type="checkbox" checked={followSystem} onChange={event => {
+          setFollowSystem(event.target.checked);
+          localStorage.setItem("lab.theme", event.target.checked ? "system" : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          window.dispatchEvent(new Event("lab:appearance-changed"));
+        }} />Follow system appearance</label>
+      </Panel>
       {error ? <ErrorNotice error={error} /> : null}
       {message ? <Notice tone="ok" title="Saved">{message}</Notice> : null}
 
-      <div className="grid-2">
+      {!demoEnabled ? <><LocalRuntimePanel /><EngineUpdatesPanel /></> : null}
+      {!managed.data ? <div className="grid-2">
         <Panel title="Backend connection" subtitle="HTTP is allowed only for loopback hosts. Use HTTPS for any remote controller.">
-          {!bridge ? <Spinner label="Reading desktop settings" /> : (
+          {!bridge ? !error ? <Spinner label="Reading desktop settings" /> : <p>Settings unavailable. Reopen Settings to retry the secure bridge.</p> : (
             <>
               <label className="field">
                 <span>Controller API base URL</span>
@@ -207,6 +225,8 @@ export function SettingsPage({ api, demoEnabled, onDemoChange }: SettingsPagePro
         </Panel>
       </div>
 
+      : null}
+
       <div className="grid-2">
         <Panel title="Data source" subtitle="Demo mode is explicit, local and clearly labelled across every screen.">
           <label className="checkbox-row">
@@ -257,6 +277,7 @@ export function SettingsPage({ api, demoEnabled, onDemoChange }: SettingsPagePro
           </ul>
         </Panel>
       </div>
+      <ResetDataPanel demo={demoEnabled} runtime={managed.data} status={status} />
     </>
   );
 }

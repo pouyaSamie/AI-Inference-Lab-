@@ -1,6 +1,6 @@
 import { usePolling } from "../lib/hooks";
 import { formatBytes, relativeTime, shortId } from "../lib/format";
-import { PageHeader, Panel, Stat, StatusBadge, Badge, EmptyState, ErrorNotice } from "../components/ui";
+import { PageHeader, Panel, Stat, StatusBadge, Badge, EmptyState, ErrorNotice, Spinner } from "../components/ui";
 import type { PageProps } from "./types";
 
 export function OverviewPage({
@@ -28,9 +28,12 @@ export function OverviewPage({
       <PageHeader
         eyebrow="Operator overview"
         title="Lab at a glance"
-        description="Controller, worker and optimizer health with the latest immutable studies. Jobs survive this window closing."
+        description="Controller, worker and optimizer health with the latest immutable studies. Minimize to keep desktop-managed local work running; independent services have their own lifecycle."
         actions={
           <>
+            <button className="button button-secondary" onClick={() => navigate("help")}>
+              Getting started
+            </button>
             <button className="button button-secondary" onClick={() => navigate("workers")}>
               Inspect workers
             </button>
@@ -40,6 +43,14 @@ export function OverviewPage({
           </>
         }
       />
+
+      <Panel title="Your next step" subtitle="Choose a model, test a configuration, then inspect the measured result.">
+        <ol className="journey-steps">
+          <li><strong>1. Prepare</strong><p>Add model folders and select one installed engine build. Verification can take time for large files.</p><button className="button button-secondary" onClick={() => navigate("settings")}>Set up engines & models</button></li>
+          <li><strong>2. Optimize</strong><p>Choose a verified model, engine, objective and context sizes. Review preflight before submitting.</p><button className="button button-primary" onClick={() => navigate("optimize")}>Plan an optimization</button></li>
+          <li><strong>3. Review</strong><p>Follow the run, compare it with its paired baseline, and save a recipe only if it qualifies.</p><button className="button button-secondary" onClick={() => navigate(active?.length ? "live" : "compare")}>{active?.length ? "Follow active runs" : "Compare results"}</button></li>
+        </ol>
+      </Panel>
 
       {statusError ? <ErrorNotice error={statusError} onRetry={refreshShell} /> : null}
       {experimentsError ? <ErrorNotice error={experimentsError} onRetry={refreshShell} /> : null}
@@ -59,14 +70,14 @@ export function OverviewPage({
         />
         <Stat
           label="Optimizer"
-          value={status?.optimizer?.online ? "Online" : "Offline"}
+          value={!status ? "Unknown" : status.optimizer?.online ? "Online" : "Offline"}
           detail={status?.optimizer?.studies_open ? `${status.optimizer.studies_open} open studies` : "Separate Optuna process"}
           tone={status?.optimizer?.online ? "ok" : "danger"}
         />
         <Stat
           label="Scheduler"
-          value={status?.scheduler_running ? "Running" : "Stopped"}
-          detail={status?.allow_simulation ? "Simulation allowed by controller policy" : "Real evidence only"}
+          value={!status ? "Unknown" : status.scheduler_running ? "Running" : "Stopped"}
+          detail={!status ? "Controller policy unavailable" : status.allow_simulation ? "Simulation allowed by controller policy" : "Real evidence only"}
           tone={status?.scheduler_running ? "ok" : "danger"}
         />
       </div>
@@ -75,24 +86,23 @@ export function OverviewPage({
         <Panel
           title="Workers"
           subtitle="Cached inventory; refresh only reads controller snapshots."
-          actions={<button className="link-button" onClick={workers.refresh}>Refresh</button>}
         >
           {workers.error ? <ErrorNotice error={workers.error} onRetry={workers.refresh} /> : null}
-          {workerList.length === 0 ? (
+          {!workers.data ? !workers.error ? <Spinner label="Loading workers" /> : null : workerList.length === 0 ? (
             <EmptyState
               title="No workers registered"
-              detail="Start the controller and worker, then register an enrollment token. The UI never starts a worker."
+              detail="Select model and engine paths in Settings. The installed app starts its local worker automatically."
             />
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
                 <thead>
                   <tr>
-                    <th>Worker</th>
-                    <th>Status</th>
-                    <th>Heartbeat</th>
-                    <th>GPU / VRAM</th>
-                    <th>Snapshot</th>
+                    <th scope="col">Worker</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Heartbeat</th>
+                    <th scope="col">GPU / VRAM</th>
+                    <th scope="col">Snapshot</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -135,7 +145,7 @@ export function OverviewPage({
           subtitle="Stage progress is controller state, not a wall-clock promise."
           actions={<button className="link-button" onClick={() => navigate("live")}>Open live runs</button>}
         >
-          {!active || active.length === 0 ? (
+          {!experiments ? !experimentsError ? <Spinner label="Loading active jobs" /> : <EmptyState title="Active job state unavailable" detail="Reconnect to retrieve durable controller state." /> : !active || active.length === 0 ? (
             <EmptyState title="No active jobs" detail="Submit a plan from Optimize to start a durable study." />
           ) : (
             <div className="job-list">
@@ -166,27 +176,26 @@ export function OverviewPage({
         <Panel
           title="Recent experiments"
           subtitle="Open any run to replay its event stream and inspect evidence."
-          actions={<button className="link-button" onClick={refreshShell}>Refresh</button>}
         >
-          {recent.length === 0 ? (
+          {!experiments ? !experimentsError ? <Spinner label="Loading experiment history" /> : null : recent.length === 0 ? (
             <EmptyState title="No experiments" detail="The controller has not persisted an experiment yet." />
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
                 <thead>
                   <tr>
-                    <th>Job</th>
-                    <th>State</th>
-                    <th>Engine</th>
-                    <th>Contexts</th>
-                    <th>Updated</th>
+                    <th scope="col">Job</th>
+                    <th scope="col">State</th>
+                    <th scope="col">Engine</th>
+                    <th scope="col">Contexts</th>
+                    <th scope="col">Updated</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recent.map((job) => (
                     <tr key={job.experiment_id} className="clickable" onClick={() => navigate("live", job.experiment_id)}>
                       <td>
-                        <strong>{job.model_id}</strong>
+                        <button className="link-button" onClick={() => navigate("live", job.experiment_id)}>{job.model_id}</button>
                         <small>{shortId(job.experiment_id, 20)}</small>
                       </td>
                       <td><StatusBadge value={job.state} /></td>
@@ -203,7 +212,7 @@ export function OverviewPage({
 
         <Panel title="Recipes" subtitle="Only measured, paired, qualified evidence becomes a validated recipe.">
           {recipes.error ? <ErrorNotice error={recipes.error} onRetry={recipes.refresh} /> : null}
-          {!recipes.data || recipes.data.recipes.length === 0 ? (
+          {!recipes.data ? !recipes.error ? <Spinner label="Loading recipes" /> : null : recipes.data.recipes.length === 0 ? (
             <EmptyState
               title="No recipes"
               detail="Simulated or inconclusive evidence never becomes a recipe. Complete a real paired baseline/candidate run first."

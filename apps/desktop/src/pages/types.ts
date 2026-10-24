@@ -15,7 +15,8 @@ export type PageId =
   | "compare"
   | "recipes"
   | "updates"
-  | "settings";
+  | "settings"
+  | "help";
 
 export interface PageProps {
   api: LabApi;

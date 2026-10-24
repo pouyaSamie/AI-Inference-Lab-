@@ -1,3 +1,4 @@
+import { EngineUpdatesPanel } from "../components/EngineUpdates";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   ComparisonPlan,
@@ -7,7 +8,7 @@ import type {
   ReleaseMetadata,
 } from "../lib/contracts";
 import { CONTEXTS, CONTEXT_LABELS } from "../lib/contracts";
-import { usePolling } from "../lib/hooks";
+import { usePageRefresh, usePolling } from "../lib/hooks";
 import { humanEnum, relativeTime, shortId } from "../lib/format";
 import {
   Badge,
@@ -160,16 +161,16 @@ function ComparisonCard({ comparison }: { comparison: ComparisonPlan }) {
             </p>
           </Notice>
           {(result.contexts?.length ?? 0) > 0 ? (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
                 <thead>
                   <tr>
-                    <th>Context</th>
-                    <th>Status</th>
-                    <th>Samples</th>
-                    <th>Score</th>
-                    <th>Improvement</th>
-                    <th>Paired interval</th>
+                    <th scope="col">Context</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Samples</th>
+                    <th scope="col">Score</th>
+                    <th scope="col">Improvement</th>
+                    <th scope="col">Paired interval</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -271,6 +272,7 @@ export function UpdatesPage({ api, navigate }: PageProps) {
   const refreshDetail = useCallback(() => {
     setDetailRevision((value) => value + 1);
   }, []);
+  usePageRefresh(refreshDetail);
 
   useEffect(() => {
     if (!selectedId) {
@@ -401,9 +403,9 @@ export function UpdatesPage({ api, navigate }: PageProps) {
   return (
     <>
       <PageHeader
-        eyebrow="Read-only release intelligence"
+        eyebrow="Engine maintenance"
         title="Updates"
-        description="Import release metadata offline, classify likely impact, pin or defer a notice, and retain paired A/B proposals. This page never queries upstream, downloads a binary, installs an engine, or approves an upgrade."
+        description="Review one engine at a time, install a build with your approval, then select it for new experiments. Installation alone does not validate performance."
         actions={
           <button className="button button-secondary" onClick={() => navigate("engines")}>
             Inspect installed engines
@@ -411,6 +413,8 @@ export function UpdatesPage({ api, navigate }: PageProps) {
         }
       />
 
+      {!api.demo ? <EngineUpdatesPanel /> : null}
+      <details className="offline-evidence"><summary>Advanced: offline release evidence & paired comparisons</summary>
       <Notice tone="info" title="Offline import only — no upstream egress">
         <p>
           The controller does not call GitHub or any release feed. Paste approved release metadata. Classification uses
@@ -427,7 +431,7 @@ export function UpdatesPage({ api, navigate }: PageProps) {
           {workers.error ? <ErrorNotice error={workers.error} onRetry={workers.refresh} /> : null}
           {snapshotError ? <ErrorNotice error={snapshotError} /> : null}
           <div className="form-grid">
-            <label>
+            <label className="field">
               Worker
               <select value={workerId} onChange={(event) => setWorkerId(event.target.value)}>
                 {workers.data?.workers.map((worker) => (
@@ -437,7 +441,7 @@ export function UpdatesPage({ api, navigate }: PageProps) {
                 ))}
               </select>
             </label>
-            <label>
+            <label className="field">
               Model
               <select value={modelId} onChange={(event) => setModelId(event.target.value)}>
                 <option value="">No model selected</option>
@@ -487,13 +491,13 @@ export function UpdatesPage({ api, navigate }: PageProps) {
         </Panel>
 
         <Panel title="Observed installed builds" subtitle="Read from registered worker snapshots, not from the network.">
-          {!workers.data ? <Spinner label="Loading worker list" /> : null}
+          {!workers.data && !workers.error ? <Spinner label="Loading worker list" /> : null}
           {workers.data?.workers.length === 0 ? (
             <EmptyState title="No workers registered" detail="No installed build can be observed without a worker snapshot." />
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
               <table>
-                <thead><tr><th>Worker</th><th>Status</th><th>Snapshot</th><th>Last heartbeat</th></tr></thead>
+                <thead><tr><th scope="col">Worker</th><th scope="col">Status</th><th scope="col">Snapshot</th><th scope="col">Last heartbeat</th></tr></thead>
                 <tbody>
                   {workers.data?.workers.map((worker) => (
                     <tr key={worker.worker_id}>
@@ -508,7 +512,7 @@ export function UpdatesPage({ api, navigate }: PageProps) {
             </div>
           )}
           <ul className="warning-list">
-            <li>Never download, replace, or patch an engine or model from the operator UI.</li>
+            <li>Engine downloads require explicit confirmation through the desktop engine manager; model downloads are not supported.</li>
             <li>Never install a binary silently or as a side effect of opening a screen.</li>
             <li>A newer build invalidates previous hash evidence until it is re-verified and re-benchmarked.</li>
           </ul>
@@ -518,10 +522,9 @@ export function UpdatesPage({ api, navigate }: PageProps) {
       <Panel
         title="Release notices"
         subtitle="Durable imported metadata and operator decisions. The controller never invents a release feed."
-        actions={<button className="button button-secondary" onClick={releases.refresh}>Refresh</button>}
       >
         {releases.error ? <ErrorNotice error={releases.error} onRetry={releases.refresh} /> : null}
-        {!releases.data ? <Spinner label="Loading release notices" /> : null}
+        {!releases.data && !releases.error ? <Spinner label="Loading release notices" /> : null}
         {releases.data && releases.data.notices.length === 0 ? (
           <EmptyState
             title="No release notices imported"
@@ -529,9 +532,9 @@ export function UpdatesPage({ api, navigate }: PageProps) {
           />
         ) : null}
         {(releases.data?.notices.length ?? 0) > 0 ? (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
             <table>
-              <thead><tr><th>Engine</th><th>Version</th><th>Build</th><th>Source</th><th>Decision</th><th>Imported</th><th /></tr></thead>
+              <thead><tr><th scope="col">Engine</th><th scope="col">Version</th><th scope="col">Build</th><th scope="col">Source</th><th scope="col">Decision</th><th scope="col">Imported</th><th scope="col" /></tr></thead>
               <tbody>
                 {releases.data?.notices.map((notice) => (
                   <tr key={notice.notice_id} className={notice.notice_id === selectedId ? "selected" : ""}>
@@ -668,7 +671,7 @@ export function UpdatesPage({ api, navigate }: PageProps) {
 
             <Panel title="Safe update rules" subtitle="These boundaries are deliberate and enforced outside the UI.">
               <ul className="warning-list">
-                <li>Import metadata offline; never fetch an artifact from this screen.</li>
+                <li>Controller release imports stay offline. The desktop manager checks official sources and verifies downloads separately.</li>
                 <li>P0/P1 applicable releases require smoke and paired A/B evidence.</li>
                 <li>Unknown changed paths fail toward smoke testing rather than being ignored.</li>
                 <li>A significant regression or guardrail failure retains the current engine.</li>
@@ -679,6 +682,7 @@ export function UpdatesPage({ api, navigate }: PageProps) {
           </div>
         </div>
       ) : null}
+      </details>
     </>
   );
 }

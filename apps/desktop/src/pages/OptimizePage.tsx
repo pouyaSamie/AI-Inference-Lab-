@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useLocalRuntime } from "../components/LocalRuntime";
+import { ModelVerificationProgress } from "../components/ModelVerification";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ContextLength,
   ExperimentPlan,
@@ -11,7 +13,7 @@ import type {
 import { CONTEXTS, CONTEXT_LABELS, OBJECTIVES, SEARCH_DEPTHS } from "../lib/contracts";
 import type { PlanResponse } from "../lib/contracts";
 import { formatBytes, shortId } from "../lib/format";
-import { Badge, ErrorNotice, Notice, PageHeader, Panel, Spinner } from "../components/ui";
+import { Badge, ErrorNotice, Notice, PageHeader, Panel, Spinner, WarningList } from "../components/ui";
 import type { PageProps } from "./types";
 
 const DEPTH_DEFAULTS: Record<SearchDepth, { maxCandidates: number; finalists: number; screening: number; final: number }> = {
@@ -30,6 +32,9 @@ const STEPS = [
 ];
 
 export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
+  const runtime = useLocalRuntime();
+  const inFlight = useRef(false);
+  const [verificationPaused, setVerificationPaused] = useState(false);
   const [step, setStep] = useState(1);
   const [workers, setWorkers] = useState<Awaited<ReturnType<PageProps["api"]["workers"]>> | null>(null);
   const [workersError, setWorkersError] = useState<unknown>(null);
@@ -96,9 +101,9 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
         setGpuUuid(data.hardware.gpus?.[0]?.uuid ?? "");
         const firstEngine = data.engines?.[0]?.engine.engine_id ?? "";
         setEngineId(firstEngine);
-        const compatible = data.models?.find((model) =>
-          (model.compatible_engines ?? []).includes(firstEngine as never),
-        );
+        const compatible = [...(data.models ?? [])].filter(model =>
+          (model.compatible_engines ?? []).includes(firstEngine as never)
+        ).sort((a, b) => (a.size_bytes ?? Infinity) - (b.size_bytes ?? Infinity))[0];
         setModelId(compatible?.model_id ?? data.models?.[0]?.model_id ?? "");
       })
       .catch((error: unknown) => {
@@ -122,6 +127,7 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
 
   const resetPlan = () => {
     setPlanResponse(null);
+    setVerificationPaused(false);
     setPreflightReason(null);
     setConfirmed(false);
     setCreateError(null);
@@ -200,11 +206,14 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
     }
     if (step === 2) return Boolean(objective);
     if (step === 3) return contexts.length > 0;
-    if (step === 4) return maxCandidates >= 1 && finalists >= 1 && finalReplications >= 2;
+    if (step === 4) return Number.isInteger(maxCandidates) && maxCandidates >= 1 && maxCandidates <= 500 && Number.isInteger(finalists) && finalists >= 1 && finalists <= Math.min(20, maxCandidates) && Number.isInteger(screening) && screening >= 1 && screening <= 20 && Number.isInteger(finalReplications) && finalReplications >= 2 && finalReplications <= 50 && Number.isFinite(threshold) && threshold >= 0 && threshold <= 100;
     return true;
   })();
 
-  const runPlan = async () => {
+  const runPlan = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setVerificationPaused(false);
     setPlanning(true);
     setPlanError(null);
     setCreateError(null);
@@ -221,12 +230,50 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
     } catch (error) {
       setPlanError(error);
     } finally {
+      inFlight.current = false;
       setPlanning(false);
     }
-  };
+  }, [api, request]);
 
+  useEffect(() => {
+    if (step === 5 && !planResponse && !planning && !planError) void runPlan();
+  }, [step, planResponse, planning, planError, runPlan]);
+
+  useEffect(() => {
+    if (step !== 5 || planResponse?.status !== "preflight_required" || verificationPaused || planning) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const commands = await api.workerCommands(workerId);
+        if (stopped) return;
+        const command = commands.find(item => item.command_id === planResponse.command_id);
+        if (!command) throw new Error("The verification job was not found. Refresh the worker and try again.");
+        if (["failed", "rejected", "cancelled", "expired"].includes(command.status)) throw new Error(command.failure?.message ?? "Model verification stopped. Check the worker and model file permissions, then retry.");
+        if (command.status === "completed") {
+          const fresh = await api.workerSnapshot(workerId);
+          if (stopped) return;
+          setSnapshot(fresh);
+          const model = fresh.models?.find(item => item.model_id === modelId);
+          if (!model || !model.files?.length || (planResponse.reason?.includes("selected model files") && model.files.some(file => !file.sha256 || !file.verified))) {
+            throw new Error("Some selected model files could not be verified. Check file access and model discovery warnings, then retry.");
+          }
+          const response = await api.plan(request);
+          if (stopped) return;
+          setPlanResponse(response); setPreflightReason(response.reason ?? null);
+          return;
+        }
+        setPreflightReason(command.status === "pending" ? "Waiting for the worker to start file verification. You do not need to re-check the plan." : "Verifying model files. Large libraries can take several minutes; the plan continues automatically when ready.");
+      } catch (error) { if (!stopped) { setPlanError(error); setVerificationPaused(true); } return; }
+      if (!stopped) timer = setTimeout(poll, 2000);
+    };
+    timer = setTimeout(poll, Math.max(500, Math.min(planResponse.retry_after_ms ?? 2000, 5000)));
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [api, workerId, modelId, request, step, planResponse, verificationPaused, planning]);
+
+  const waitingForVerification = planResponse?.status === "preflight_required" && !verificationPaused;
   const createExperiment = async () => {
-    if (!planResponse?.plan || !confirmed) return;
+    if (planResponse?.status !== "ready" || !planResponse.plan || !confirmed || api.demo) return;
     setCreating(true);
     setCreateError(null);
     try {
@@ -249,7 +296,7 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
       <PageHeader
         eyebrow="Immutable experiment wizard"
         title="Optimize"
-        description="Create one durable study. The plan is a snapshot; submitting it never performs a live worker call from this window."
+        description="Choose a model and what to improve. We prepare the files and check readiness before you start the test."
         actions={<Badge tone="info">{api.demo ? "Demo plan only" : "Real controller"}</Badge>}
       />
 
@@ -258,7 +305,7 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
           const number = index + 1;
           return (
             <li key={label} className={number === step ? "active" : number < step ? "done" : ""}>
-              <button onClick={() => number < step && setStep(number)}>
+              <button aria-current={number === step ? "step" : undefined} disabled={number > step} onClick={() => number < step && setStep(number)}>
                 <span>{number}</span>
                 {label}
               </button>
@@ -273,7 +320,7 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
       {step === 1 ? (
         <div className="grid-2">
           <Panel title="Target worker" subtitle="Only cached inventory from a registered worker is selectable.">
-            {!workers ? <Spinner label="Loading workers" /> : null}
+            {!workers && !workersError ? <Spinner label="Loading workers" /> : null}
             {workers?.workers.length === 0 ? (
               <Notice tone="warn" title="No workers registered">
                 Start the controller and register a worker. The UI cannot start or enroll a worker itself.
@@ -333,9 +380,9 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
                     value={engineId}
                     onChange={(event) => {
                       setEngineId(event.target.value);
-                      const first = models.find((model) =>
+                      const first = models.filter((model) =>
                         (model.compatible_engines ?? []).includes(event.target.value as never),
-                      );
+                      ).sort((a, b) => (a.size_bytes ?? Infinity) - (b.size_bytes ?? Infinity))[0];
                       setModelId(first?.model_id ?? "");
                       resetPlan();
                     }}
@@ -404,7 +451,7 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
       {step === 3 ? (
         <Panel
           title="Contexts"
-          subtitle="Feasibility is a preflight outcome. Selecting an infeasible target is allowed and must be reported, never fabricated."
+          subtitle="Choose the conversation lengths to test. Memory fit is checked automatically when the test starts; start with 4K for a shorter first run."
         >
           <div className="context-grid">
             {CONTEXTS.map((context) => {
@@ -414,6 +461,7 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
                 <button
                   type="button"
                   key={context}
+                  aria-pressed={selected}
                   className={`context-card ${selected ? "selected" : ""}`}
                   onClick={() => toggleContext(context)}
                 >
@@ -427,7 +475,7 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
                       {result.status?.replaceAll("_", " ") ?? "unknown"}
                     </Badge>
                   ) : (
-                    <Badge tone="neutral">preflight pending</Badge>
+                    <Badge tone="neutral">Checked when test starts</Badge>
                   )}
                 </button>
               );
@@ -452,6 +500,14 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
       {step === 4 ? (
         <div className="grid-2">
           <Panel title="Search depth" subtitle="Budget caps are explicit. The controller enforces them.">
+            <Notice title="Comparing with your manual tests"><p>A finite search finds the best settings it tested. It can miss your hand-tuned configuration. For a fair comparison, match the model and engine build, context, prompt and generated token counts, cache state, GPU load and reasoning mode. Generation max targets output speed; Balanced also scores prompt processing. More candidates explore more settings, without guaranteeing a faster result.</p></Notice>
+            {engineId === "strata" ? <Notice tone="warn" title="Strata search coverage"><p>This search keeps experts file-backed and does not explore resident-expert or asynchronous adaptation profiles. A manually tuned profile using those settings may be faster. Compare matching workloads and timing methods; app rates are measured from the client, so engine-only rates are not interchangeable.</p></Notice> : null}
+            <button className="button button-secondary" onClick={() => {
+              setDepth("quick"); setMaxCandidates(1); setFinalists(1); setScreening(1); setFinalReplications(2);
+              setContexts([4096]); setRecipeMode("per_context"); setObjective("balanced");
+              setQuietGpu(true); setRequireFullContext(true); resetPlan();
+            }}>Small setup test</button>
+            <p className="muted">Check your setup with one 4K context, one candidate and the minimum repetitions. Duration is unknown until the engine runs. This does not guarantee a validated recipe.</p>
             <div className="choice-list">
               {SEARCH_DEPTHS.map((option) => (
                 <label key={option.value} className={`choice-card tall ${depth === option.value ? "selected" : ""}`}>
@@ -469,6 +525,7 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
             </Notice>
           </Panel>
           <Panel title="Advanced limits" subtitle="Changes create a new plan; they never mutate an existing study.">
+            <details className="advanced-limits"><summary>Adjust budgets and qualification</summary>
             <div className="form-grid">
               <label className="field">
                 <span>Max distinct candidates</span>
@@ -506,13 +563,14 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
               <input type="checkbox" checked={quietGpu} onChange={(event) => { setQuietGpu(event.target.checked); resetPlan(); }} />
               Require a quiet GPU and reject contaminated trials
             </label>
+            </details>
           </Panel>
         </div>
       ) : null}
 
       {step === 5 ? (
         <div className="grid-2">
-          <Panel title="Preflight and plan" subtitle="Planning is snapshot-only and never starts a worker call.">
+          <Panel title="Check readiness" subtitle="We verify model files and prepare the test automatically. No manual terminal steps are needed.">
             <div className="review-list">
               <ReviewRow label="Worker" value={workerId || "not selected"} />
               <ReviewRow label="GPU" value={gpuUuid || "no GPU selected"} />
@@ -523,11 +581,12 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
               <ReviewRow label="Search" value={`${depth} · ${maxCandidates} candidates · ${finalists} finalists`} />
               <ReviewRow label="Gate" value={`≥${threshold}% improvement · ${Math.round(confidence * 100)}% paired interval`} />
             </div>
-            <button className="button button-primary" onClick={runPlan} disabled={planning || !canContinue}>
-              {planning ? "Planning…" : planResponse?.status === "preflight_required" ? "Re-check plan" : "Run plan check"}
+            <button className="button button-primary" onClick={runPlan} disabled={planning || waitingForVerification || !canContinue}>
+              {waitingForVerification ? "Verification in progress…" : planning ? "Checking…" : "Retry readiness check"}
             </button>
             {planError ? <ErrorNotice error={planError} onRetry={runPlan} /> : null}
-            {preflightReason ? <Notice tone="warn" title="Preflight required">{preflightReason}</Notice> : null}
+            {preflightReason ? <Notice tone={verificationPaused ? "warn" : "info"} title={verificationPaused ? "Needs attention" : "Preparing your test"}>{preflightReason}</Notice> : null}
+            <ModelVerificationProgress value={api.demo ? undefined : runtime.data?.inventory?.verification} />
           </Panel>
           <Panel title="Plan result">
             {!planResponse ? (
@@ -535,23 +594,27 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
             ) : (
               <>
                 <div className="plan-status">
-                  <Badge tone={planResponse.status === "ready" ? "ok" : "warn"}>{planResponse.status.replaceAll("_", " ")}</Badge>
+                  <Badge tone={planResponse.status === "ready" ? "info" : "warn"}>{planResponse.status === "preflight_required" ? verificationPaused ? "Needs attention" : "Checking model files" : "Plan ready to submit"}</Badge>
                   {planResponse.plan ? <span className="mono">{shortId(planResponse.plan.plan_id, 24)}</span> : null}
                 </div>
+                {planResponse.status === "preflight_required" ? <Notice tone="warn" title="Preflight required — submission blocked">
+                  <p>{planResponse.reason}</p><p>Queued command: <code>{planResponse.command_id}</code></p>
+                  <p>The controller must return a fresh ready plan before review and submission.</p>
+                </Notice> : null}
                 {planResponse.plan ? (
                   <>
                     <p className="muted">
                       Inventory snapshot revision {planResponse.plan.worker_snapshot_revision ?? "unknown"} · digest{" "}
                       <span className="mono">{shortId(planResponse.plan.inventory_snapshot_digest, 20)}</span>
                     </p>
-                    <div className="table-wrap">
+                    <div className="table-wrap" tabIndex={0} role="region" aria-label="Scrollable data table">
                       <table>
-                        <thead><tr><th>Context</th><th>Feasibility</th><th>Required proof</th><th>Evidence</th></tr></thead>
+                        <thead><tr><th scope="col">Context</th><th scope="col">Feasibility</th><th scope="col">Required proof</th><th scope="col">Evidence</th></tr></thead>
                         <tbody>
                           {(planResponse.plan.feasibility ?? []).map((item) => (
                             <tr key={item.context}>
                               <td>{CONTEXT_LABELS[item.context]}</td>
-                              <td><Badge tone={item.status === "feasible" ? "ok" : "danger"}>{item.status ?? "unknown"}</Badge></td>
+                              <td><Badge tone={item.status === "feasible" ? "ok" : item.status === "unknown" ? "neutral" : "warn"}>{item.status === "unknown" ? "Checked during test" : item.status ?? "Checked during test"}</Badge></td>
                               <td>{item.requires_full_context_proof ? "yes" : "no"}</td>
                               <td>{item.reason ?? item.evidence?.[0] ?? "—"}</td>
                             </tr>
@@ -560,16 +623,9 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
                       </table>
                     </div>
                     {(planResponse.plan.warnings?.length ?? 0) > 0 ? (
-                      <ul className="warning-list">
-                        {planResponse.plan.warnings?.map((warning) => <li key={warning}>{warning}</li>)}
-                      </ul>
+                      <WarningList warnings={planResponse.plan.warnings ?? []} />
                     ) : null}
-                    <div className="button-row">
-                      <button className="button button-secondary" onClick={() => setStep(5)}>Back to review</button>
-                      <button className="button button-primary" onClick={() => setStep(6)} disabled={planResponse.status !== "ready"}>
-                        Continue to submit
-                      </button>
-                    </div>
+                    <p className="muted">The worker still needs to check context fit and safe execution before measurements begin.</p>
                   </>
                 ) : null}
               </>
@@ -584,10 +640,11 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
             <PlanSummary plan={planResponse.plan} />
             <label className="checkbox-row confirmation">
               <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-              I understand this creates one immutable study. Closing this window will not stop it.
+              I understand this creates one immutable study. Minimizing keeps local services running. Quit may stop desktop-managed local work; independent services continue.
             </label>
             {createError ? <ErrorNotice error={createError} onRetry={createExperiment} /> : null}
-            <button className="button button-primary" onClick={createExperiment} disabled={!confirmed || creating}>
+            {api.demo ? <Notice tone="info" title="Demo plan only">Submission is unavailable in offline demo mode. No job will be created.</Notice> : null}
+            <button className="button button-primary" onClick={createExperiment} disabled={api.demo || !confirmed || creating || planResponse.status !== "ready"}>
               {creating ? "Creating durable job…" : "Create experiment"}
             </button>
           </Panel>
@@ -607,18 +664,19 @@ export function OptimizePage({ api, navigate, refreshShell }: PageProps) {
         </div>
       ) : null}
 
+      {!canContinue ? <Notice tone="warn" title="Selection needs attention">{step === 1 ? "Select a compatible worker, engine, model and GPU from cached inventory." : step === 3 ? "Choose at least one context." : "Use whole-number budgets within the shown limits. Finalists cannot exceed the candidate budget; final repetitions must be at least two."}</Notice> : null}
       <div className="wizard-nav">
         <button className="button button-secondary" onClick={() => setStep((value) => Math.max(1, value - 1))} disabled={step === 1}>
           Back
         </button>
-        <div className="wizard-progress">Step {step} of {STEPS.length}</div>
+        <div className="wizard-progress" role="status">Step {step} of {STEPS.length}</div>
         {step < 5 ? (
           <button className="button button-primary" onClick={() => setStep((value) => Math.min(6, value + 1))} disabled={!canContinue}>
             Continue
           </button>
         ) : step === 5 ? (
-          <button className="button button-primary" onClick={runPlan} disabled={planning || !canContinue}>
-            {planning ? "Planning…" : "Run plan check"}
+          <button className="button button-primary" onClick={planResponse?.status === "ready" ? () => setStep(6) : runPlan} disabled={planning || waitingForVerification || !canContinue}>
+            {planResponse?.status === "ready" ? "Review and start test" : waitingForVerification ? "Verification in progress…" : planning ? "Checking…" : "Retry readiness check"}
           </button>
         ) : (
           <button className="button button-secondary" onClick={() => setStep(5)}>Review plan</button>
@@ -654,9 +712,7 @@ function PlanSummary({ plan }: { plan: ExperimentPlan }) {
         <ReviewRow label="Inventory digest" value={shortId(plan.inventory_snapshot_digest, 30)} />
       </div>
       {(plan.warnings?.length ?? 0) > 0 ? (
-        <ul className="warning-list">
-          {plan.warnings?.map((warning) => <li key={warning}>{warning}</li>)}
-        </ul>
+        <WarningList warnings={plan.warnings ?? []} />
       ) : null}
     </>
   );

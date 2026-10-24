@@ -10,6 +10,7 @@ import {
   StatusBadge,
   Spinner,
   KeyValues,
+  WarningList,
 } from "../components/ui";
 import type { PageProps } from "./types";
 import type { GPUDevice, WorkerSnapshot } from "../lib/contracts";
@@ -33,7 +34,6 @@ function WorkerDetail({ api, workerId }: { api: PageProps["api"]; workerId: stri
       <Panel
         title="Hardware"
         subtitle={`Collected ${relativeTime(hardware.collected_at)} · snapshot revision ${data.revision}`}
-        actions={<button className="link-button" onClick={snapshot.refresh}>Refresh snapshot</button>}
       >
         <KeyValues
           items={[
@@ -83,9 +83,7 @@ function WorkerDetail({ api, workerId }: { api: PageProps["api"]; workerId: stri
             ]}
           />
           {warnings.length > 0 ? (
-            <ul className="warning-list">
-              {warnings.map((warning) => <li key={warning}>{warning}</li>)}
-            </ul>
+            <WarningList warnings={warnings} />
           ) : (
             <p className="muted">No worker warnings reported.</p>
           )}
@@ -118,10 +116,9 @@ export function WorkersPage({ api }: PageProps) {
         eyebrow="Outbound command transport"
         title="Workers"
         description="Workers pull commands; no inbound port is required. A lease or snapshot is evidence of controller state, not a guarantee of GPU health."
-        actions={<button className="button button-secondary" onClick={workers.refresh}>Refresh</button>}
       />
       {workers.error ? <ErrorNotice error={workers.error} onRetry={workers.refresh} /> : null}
-      {!workers.data ? <Spinner label="Loading workers" /> : null}
+      {!workers.data && !workers.error ? <Spinner label="Loading workers" /> : null}
       {workers.data && workers.data.workers.length === 0 ? (
         <Panel><EmptyState title="No workers registered" detail="Register an enrollment token and start the worker service." /></Panel>
       ) : null}
@@ -130,6 +127,7 @@ export function WorkersPage({ api }: PageProps) {
           {workers.data.workers.map((worker) => (
             <button
               key={worker.worker_id}
+              aria-pressed={workerId === worker.worker_id}
               className={`worker-tile ${workerId === worker.worker_id ? "selected" : ""}`}
               onClick={() => setWorkerId(worker.worker_id)}
             >
