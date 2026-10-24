@@ -154,6 +154,11 @@ def create_experiment(
         )
 
     spec = plan.spec
+    from ..orm import WorkerRow
+
+    worker = session.get(WorkerRow, spec.worker_id)
+    if worker and worker.serving_json.get("state") in {"starting", "ready"}:
+        raise ConflictError("Stop the running recipe engine before starting a benchmark.")
     experiment_id = stable_id("exp", spec.spec_digest, plan.plan_digest, idempotency_key)
     now = utcnow()
     experiment = ExperimentRow(
@@ -202,7 +207,10 @@ def create_experiment(
         objective=spec.objective.value,
         contexts=spec.contexts,
     )
-    study_id = stable_id("study", spec.spec_digest, plan.plan_digest)
+    # Identical plans may be run again after completion or cancellation. Scope
+    # the optimizer study to this durable experiment; same-key replays return
+    # above and keep the original study and ask/tell history intact.
+    study_id = stable_id("study", experiment_id)
     study = StudyRow(
         study_id=study_id,
         experiment_id=experiment_id,

@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from lab_core.base import utcnow
+from lab_core.base import Identifier, utcnow
 from lab_core.errors import AuthorizationError, NotFoundError
 from sqlalchemy.orm import Session
 
-from lab_core import CommandAck, CommandCompletion, WorkerPollResponse, WorkerSnapshot
+from lab_core import CommandAck, CommandCompletion, CommandStatusView, WorkerPollResponse, WorkerSnapshot
 
 from ..config import Settings
 from ..dependencies import get_session, get_settings
@@ -267,7 +267,7 @@ def complete(
     )
 
 
-@router.get("/api/v1/workers/{worker_id}/commands")
+@router.get("/api/v1/workers/{worker_id}/commands", response_model=list[CommandStatusView])
 def list_worker_commands(
     worker_id: str,
     session: Session = Depends(get_session),
@@ -280,3 +280,22 @@ def list_worker_commands(
         .all()
     )
     return [command_status_view(row).model_dump(mode="json") for row in rows]
+
+
+@router.post("/api/v1/workers/{worker_id}/verify-models", response_model=CommandStatusView)
+def verify_models(
+    worker_id: str,
+    model_id: Identifier | None = None,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    principal: Principal = Depends(require_operator),
+) -> CommandStatusView:
+    from ..services.planning import _queue_scan
+
+    if session.get(WorkerRow, worker_id) is None:
+        raise NotFoundError("worker not found")
+    command = _queue_scan(
+        session, settings, worker_id, "Verify imported model files", model_id=model_id, verify=True
+    )
+    session.commit()
+    return command_status_view(command)

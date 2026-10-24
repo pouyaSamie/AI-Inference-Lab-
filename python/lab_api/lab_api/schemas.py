@@ -241,6 +241,7 @@ class SystemStatusResponse(FrozenModel):
     optimizer: OptimizerHealth
     workers_online: NonNegativeInt
     experiments_active: NonNegativeInt
+    serving_active: NonNegativeInt = 0
     scheduler_running: bool
     allow_simulation: bool
     warnings: tuple[str, ...] = ()

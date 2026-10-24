@@ -10,7 +10,7 @@ from typing import Any
 from lab_core.base import utcnow
 from lab_core.errors import ConflictError, LeaseConflictError, NotFoundError
 from lab_core.ids import new_id, sha256_hex
-from sqlalchemy import select
+from sqlalchemy import select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -18,11 +18,15 @@ from lab_core import (
     AckDisposition,
     CommandAck,
     CommandCompletion,
+    CommandFailure,
     CommandPayload,
     CommandStatus,
     CommandStatusView,
     CommandType,
     EventType,
+    FailureKind,
+    JobStage,
+    JobState,
     WorkerCommand,
     WorkerCommandLease,
     WorkerPollResponse,
@@ -30,7 +34,36 @@ from lab_core import (
 
 from ..config import Settings
 from ..events import append_event
-from ..orm import WorkerCommandRow, WorkerRow, as_utc
+from ..orm import ExperimentRow, WorkerCommandRow, WorkerRow, as_utc
+from .lifecycle import transition_experiment
+
+
+def _block_failed_preflight(session: Session, row: WorkerCommandRow, code: str) -> None:
+    """An unsuccessful transport outcome must not leave preflight looking active."""
+    if row.command_type != CommandType.PREFLIGHT.value or not row.experiment_id:
+        return
+    experiment = session.get(ExperimentRow, row.experiment_id)
+    if experiment is None or experiment.state not in {JobState.PREFLIGHTING.value, JobState.READY.value}:
+        return
+    experiment.preflight_passed = False
+    experiment.error_code = code
+    # Raw process/transport errors can contain paths and argv. Keep those out of
+    # the operator message; the durable failure record retains diagnostic facts.
+    experiment.error_message = (
+        "The worker could not complete the setup check. Check the selected engine "
+        "and worker, then retry preflight. No inference result was produced."
+    )
+    if "ExecutableTrustError" in (row.last_error or ""):
+        experiment.error_message = (
+            "The selected engine could not pass its executable identity check. "
+            "Rescan engine builds in Settings, then retry preflight."
+        )
+    elif code == "PREFLIGHT_LEASE_EXPIRED":
+        experiment.error_message = (
+            "The worker did not finish the setup check before its command lease expired. "
+            "Check worker health, then retry preflight."
+        )
+    transition_experiment(session, experiment, JobState.BLOCKED, stage=JobStage.PREFLIGHT)
 
 
 def _hash_lease(token: str) -> str:
@@ -126,12 +159,23 @@ def expire_stale_leases(session: Session, settings: Settings) -> int:
         )
     ).all()
     for row in rows:
-        if row.attempts >= settings.command_max_attempts:
+        interactive = row.command_type in {CommandType.RUN_RECIPE.value, CommandType.RECIPE_CHAT.value}
+        if interactive or row.attempts >= settings.command_max_attempts:
             row.status = CommandStatus.EXPIRED.value
             row.lease_token_hash = None
             row.lease_expires_at = None
-            row.last_error = "lease expired after maximum attempts"
+            row.last_error = (
+                "interactive request expired; retry explicitly"
+                if interactive
+                else "lease expired after maximum attempts"
+            )
             row.completed_at = now
+            if interactive:
+                row.failure_json = CommandFailure(
+                    kind=FailureKind.TIMEOUT,
+                    message="The engine request expired. Review its status and retry explicitly.",
+                    retryable=False,
+                ).model_dump(mode="json")
             if row.experiment_id:
                 append_event(
                     session,
@@ -143,6 +187,7 @@ def expire_stale_leases(session: Session, settings: Settings) -> int:
                         "reason": "LEASE_EXPIRED",
                     },
                 )
+            _block_failed_preflight(session, row, "PREFLIGHT_LEASE_EXPIRED")
         else:
             row.status = CommandStatus.PENDING.value
             row.lease_token_hash = None
@@ -168,20 +213,46 @@ def poll_commands(
         raise ConflictError("worker is disabled")
     expire_stale_leases(session, settings)
     limit = min(max_commands or settings.max_command_batch, settings.max_command_batch)
+    lifecycle = (CommandType.CANCEL.value, CommandType.PAUSE.value, CommandType.STOP_RECIPE.value)
+    active_execution = session.scalar(
+        select(WorkerCommandRow.command_id)
+        .where(
+            WorkerCommandRow.worker_id == worker_id,
+            WorkerCommandRow.status.in_(
+                [
+                    CommandStatus.LEASED.value,
+                    CommandStatus.ACKNOWLEDGED.value,
+                    CommandStatus.RUNNING.value,
+                ]
+            ),
+            WorkerCommandRow.command_type.not_in(lifecycle),
+        )
+        .limit(1)
+    )
     rows = list(
         session.scalars(
             select(WorkerCommandRow)
             .where(
                 WorkerCommandRow.worker_id == worker_id,
                 WorkerCommandRow.status == CommandStatus.PENDING.value,
+                (WorkerCommandRow.command_type.in_(lifecycle) if active_execution else true()),
             )
-            .order_by(WorkerCommandRow.created_at, WorkerCommandRow.command_id)
+            .order_by(
+                WorkerCommandRow.command_type.in_(lifecycle).desc(),
+                WorkerCommandRow.created_at,
+                WorkerCommandRow.command_id,
+            )
             .limit(limit)
         )
     )
     leases: list[WorkerCommandLease] = []
     now = utcnow()
+    execution_leased = bool(active_execution)
     for row in rows:
+        if row.command_type not in lifecycle:
+            if execution_leased:
+                continue
+            execution_leased = True
         token = secrets.token_urlsafe(32)
         row.status = CommandStatus.LEASED.value
         row.attempts += 1
@@ -258,6 +329,7 @@ def ack_command(
         row.lease_expires_at = None
         row.completed_at = utcnow()
         row.last_error = ack.message or "worker rejected command"
+        _block_failed_preflight(session, row, "PREFLIGHT_REJECTED")
         if row.experiment_id:
             append_event(
                 session,
@@ -325,7 +397,12 @@ def complete_command(
     }:
         stored = row.result_json
         submitted = completion.result.model_dump(mode="json") if completion.result else None
-        if row.status == completion.outcome.value and stored == submitted:
+        submitted_failure = completion.failure.model_dump(mode="json") if completion.failure else None
+        if (
+            row.status == completion.outcome.value
+            and stored == submitted
+            and row.failure_json == submitted_failure
+        ):
             return row, True
         raise ConflictError(
             "command already reached a different terminal outcome",
@@ -362,6 +439,7 @@ def complete_command(
                 "failure": completion.failure.model_dump(mode="json") if completion.failure else None,
             },
         )
+        _block_failed_preflight(session, row, "PREFLIGHT_EXECUTION_FAILED")
     session.commit()
     return row, False
 
@@ -373,7 +451,8 @@ def command_status_view(row: WorkerCommandRow) -> CommandStatusView:
         from lab_core.commands import CommandResult
         from pydantic import TypeAdapter
 
-        result = TypeAdapter(CommandResult).validate_python(row.result_json)  # type: ignore[arg-type]
+        adapter: TypeAdapter[CommandResult] = TypeAdapter(CommandResult)
+        result = adapter.validate_python(row.result_json)
     if row.failure_json:
         from lab_core.commands import CommandFailure
 

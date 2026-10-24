@@ -150,6 +150,10 @@ export interface components {
     "CapabilityKind": "bool" | "int" | "float" | "enum" | "string";
     "CapabilityProvenance": "observed_cli" | "observed_server_api" | "approved_rule" | "installed_manifest" | "unverified";
     "ChangedArea": "cuda_kernel" | "backend_selection" | "moe" | "kv_cache" | "context" | "model_loader" | "scheduling" | "threading" | "batching" | "server_api" | "documentation" | "test_only" | "gpu_arch" | "other" | "unknown";
+    "ChatMessage": {
+      "content": components["schemas"]["NonEmptyStr"];
+      "role": "user" | "assistant";
+    };
     "ClaimTrialPayload": {
       "candidate_id": components["schemas"]["Identifier"];
       "command_type"?: "CLAIM_TRIAL";
@@ -181,7 +185,7 @@ export interface components {
       "lease_generation": components["schemas"]["PositiveInt"];
       "lease_token": components["schemas"]["NonEmptyStr"];
       "outcome": components["schemas"]["CommandStatus"];
-      "result"?: components["schemas"]["ScanResult"] | components["schemas"]["PreflightResult"] | components["schemas"]["TrialResult"] | components["schemas"]["PauseResult"] | components["schemas"]["CancelResult"] | components["schemas"]["VerifyRecipeResult"] | components["schemas"]["PromoteResult"] | null;
+      "result"?: components["schemas"]["ScanResult"] | components["schemas"]["PreflightResult"] | components["schemas"]["TrialResult"] | components["schemas"]["PauseResult"] | components["schemas"]["CancelResult"] | components["schemas"]["VerifyRecipeResult"] | components["schemas"]["PromoteResult"] | components["schemas"]["RunRecipeResult"] | components["schemas"]["StopRecipeResult"] | components["schemas"]["RecipeChatResult"] | null;
       "worker_id": components["schemas"]["Identifier"];
     };
     "CommandFailure": {
@@ -193,7 +197,21 @@ export interface components {
       "retryable"?: boolean;
     };
     "CommandStatus": "pending" | "leased" | "acknowledged" | "running" | "completed" | "failed" | "rejected" | "expired" | "cancelled";
-    "CommandType": "SCAN" | "PREFLIGHT" | "CLAIM_TRIAL" | "PAUSE" | "CANCEL" | "VERIFY_RECIPE" | "PROMOTE";
+    "CommandStatusView": {
+      "ack_at"?: components["schemas"]["AwareTimestamp"] | null;
+      "attempts": components["schemas"]["NonNegativeInt"];
+      "command_id": components["schemas"]["Identifier"];
+      "command_type": components["schemas"]["CommandType"];
+      "completed_at"?: components["schemas"]["AwareTimestamp"] | null;
+      "created_at": components["schemas"]["AwareTimestamp"];
+      "experiment_id"?: components["schemas"]["Identifier"] | null;
+      "failure"?: components["schemas"]["CommandFailure"] | null;
+      "lease_generation": components["schemas"]["NonNegativeInt"];
+      "result"?: components["schemas"]["ScanResult"] | components["schemas"]["PreflightResult"] | components["schemas"]["TrialResult"] | components["schemas"]["PauseResult"] | components["schemas"]["CancelResult"] | components["schemas"]["VerifyRecipeResult"] | components["schemas"]["PromoteResult"] | components["schemas"]["RunRecipeResult"] | components["schemas"]["StopRecipeResult"] | components["schemas"]["RecipeChatResult"] | null;
+      "status": components["schemas"]["CommandStatus"];
+      "worker_id": components["schemas"]["Identifier"];
+    };
+    "CommandType": "RUN_RECIPE" | "STOP_RECIPE" | "RECIPE_CHAT" | "SCAN" | "PREFLIGHT" | "CLAIM_TRIAL" | "PAUSE" | "CANCEL" | "VERIFY_RECIPE" | "PROMOTE";
     "ComparisonCreateRequest": {
       "assessment_id": components["schemas"]["Identifier"];
       "confidence_level"?: number;
@@ -807,6 +825,22 @@ export interface components {
       "sha256": components["schemas"]["Sha256"];
       "size_bytes"?: number;
     };
+    "RecipeChatPayload": {
+      "command_type"?: "RECIPE_CHAT";
+      "max_tokens"?: number;
+      "messages": components["schemas"]["ChatMessage"][];
+      "session_id": components["schemas"]["Identifier"];
+    };
+    "RecipeChatRequest": {
+      "max_tokens"?: number;
+      "messages": components["schemas"]["ChatMessage"][];
+      "session_id": components["schemas"]["Identifier"];
+    };
+    "RecipeChatResult": {
+      "command_type"?: "RECIPE_CHAT";
+      "content": string;
+      "session_id": components["schemas"]["Identifier"];
+    };
     "RecipeCreateRequest": {
       "candidate_id": components["schemas"]["Identifier"];
       "experiment_id": components["schemas"]["Identifier"];
@@ -913,12 +947,28 @@ export interface components {
       "quiet_gpu_required"?: boolean;
       "require_full_context_proof"?: boolean;
     };
+    "RunRecipePayload": {
+      "candidate": components["schemas"]["CandidateSpec"];
+      "command_type"?: "RUN_RECIPE";
+      "gpu_uuid": components["schemas"]["NonEmptyStr"];
+      "issued_at"?: components["schemas"]["AwareTimestamp"];
+      "model": components["schemas"]["ModelArtifact"];
+      "profile_sha256"?: components["schemas"]["Sha256"] | null;
+      "recipe_digest": components["schemas"]["Sha256"];
+      "recipe_id": components["schemas"]["Identifier"];
+      "session_id": components["schemas"]["Identifier"];
+    };
+    "RunRecipeResult": {
+      "command_type"?: "RUN_RECIPE";
+      "session": components["schemas"]["ServingSession"];
+    };
     "ScanPayload": {
       "command_type"?: "SCAN";
       "hash_models"?: boolean;
       "include_engines"?: boolean;
       "include_hardware"?: boolean;
       "include_models"?: boolean;
+      "model_id"?: components["schemas"]["Identifier"] | null;
       "reason"?: string | null;
       "roots": string[];
     };
@@ -958,7 +1008,29 @@ export interface components {
       "notes"?: string[];
       "schema_version"?: components["schemas"]["NonEmptyStr"];
     };
+    "ServingSession": {
+      "bytes_done"?: number;
+      "bytes_total"?: number;
+      "context_tokens": number;
+      "files_done"?: number;
+      "files_total"?: number;
+      "message"?: string;
+      "port"?: number | null;
+      "recipe_id": components["schemas"]["Identifier"];
+      "session_id": components["schemas"]["Identifier"];
+      "started_at": components["schemas"]["AwareTimestamp"];
+      "state": "starting" | "ready" | "stopped" | "failed";
+    };
     "Sha256": string;
+    "StopRecipePayload": {
+      "command_type"?: "STOP_RECIPE";
+      "session_id": components["schemas"]["Identifier"];
+    };
+    "StopRecipeResult": {
+      "command_type"?: "STOP_RECIPE";
+      "session_id": components["schemas"]["Identifier"];
+      "stopped": boolean;
+    };
     "StudyCreatedResult": {
       "created": boolean;
       "kind"?: "STUDY_CREATED";
@@ -976,6 +1048,7 @@ export interface components {
       "optimizer_db": string;
       "scheduler_running": boolean;
       "service": string;
+      "serving_active"?: components["schemas"]["NonNegativeInt"];
       "version": string;
       "warnings"?: string[];
       "workers_online": components["schemas"]["NonNegativeInt"];
@@ -1043,7 +1116,7 @@ export interface components {
       "created_at"?: components["schemas"]["AwareTimestamp"];
       "expected_snapshot_revision"?: components["schemas"]["NonNegativeInt"];
       "idempotency_key": components["schemas"]["NonEmptyStr"];
-      "payload": components["schemas"]["ScanPayload"] | components["schemas"]["PreflightPayload"] | components["schemas"]["ClaimTrialPayload"] | components["schemas"]["PausePayload"] | components["schemas"]["CancelPayload"] | components["schemas"]["VerifyRecipePayload"] | components["schemas"]["PromotePayload"];
+      "payload": components["schemas"]["ScanPayload"] | components["schemas"]["PreflightPayload"] | components["schemas"]["ClaimTrialPayload"] | components["schemas"]["PausePayload"] | components["schemas"]["CancelPayload"] | components["schemas"]["VerifyRecipePayload"] | components["schemas"]["PromotePayload"] | components["schemas"]["RunRecipePayload"] | components["schemas"]["StopRecipePayload"] | components["schemas"]["RecipeChatPayload"];
       "protocol_version"?: components["schemas"]["NonEmptyStr"];
       "schema_version"?: components["schemas"]["NonEmptyStr"];
       "trace_id"?: string | null;
@@ -1060,6 +1133,7 @@ export interface components {
       "isolated"?: boolean;
       "last_heartbeat_at": components["schemas"]["AwareTimestamp"];
       "owned_pids"?: number[];
+      "serving"?: components["schemas"]["ServingSession"] | null;
       "status"?: string;
       "warnings"?: string[];
     };
@@ -1440,6 +1514,19 @@ export interface operations {
     "422": components["schemas"]["HTTPValidationError"];
   };
   };
+  "run_api_v1_recipes__recipe_id__run_post": {
+    method: "POST";
+    parameters: {
+      "recipe_id": string;
+      "Idempotency-Key"?: string | null;
+      "authorization"?: string | null;
+    };
+    requestBody: never;
+    responses: {
+    "200": components["schemas"]["CommandStatusView"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
   "verify_api_v1_recipes__recipe_id__verify_post": {
     method: "POST";
     parameters: {
@@ -1500,6 +1587,44 @@ export interface operations {
     "422": components["schemas"]["HTTPValidationError"];
   };
   };
+  "status_api_v1_serving__worker_id__get": {
+    method: "GET";
+    parameters: {
+      "worker_id": string;
+      "authorization"?: string | null;
+    };
+    requestBody: never;
+    responses: {
+    "200": components["schemas"]["ServingSession"] | null;
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
+  "chat_api_v1_serving__worker_id__chat_post": {
+    method: "POST";
+    parameters: {
+      "worker_id": string;
+      "Idempotency-Key"?: string | null;
+      "authorization"?: string | null;
+    };
+    requestBody: components["schemas"]["RecipeChatRequest"];
+    responses: {
+    "200": components["schemas"]["CommandStatusView"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
+  "stop_api_v1_serving__worker_id___session_id__stop_post": {
+    method: "POST";
+    parameters: {
+      "worker_id": string;
+      "session_id": string;
+      "authorization"?: string | null;
+    };
+    requestBody: never;
+    responses: {
+    "200": components["schemas"]["CommandStatusView"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
   "status_api_v1_status_get": {
     method: "GET";
     parameters: {
@@ -1553,9 +1678,7 @@ export interface operations {
     };
     requestBody: never;
     responses: {
-    "200": ({
-  [key: string]: unknown;
-})[];
+    "200": components["schemas"]["CommandStatusView"][];
     "422": components["schemas"]["HTTPValidationError"];
   };
   };
@@ -1646,6 +1769,19 @@ export interface operations {
     "422": components["schemas"]["HTTPValidationError"];
   };
   };
+  "verify_models_api_v1_workers__worker_id__verify_models_post": {
+    method: "POST";
+    parameters: {
+      "worker_id": string;
+      "model_id"?: components["schemas"]["Identifier"] | null;
+      "authorization"?: string | null;
+    };
+    requestBody: never;
+    responses: {
+    "200": components["schemas"]["CommandStatusView"];
+    "422": components["schemas"]["HTTPValidationError"];
+  };
+  };
   "health_health_get": {
     method: "GET";
     parameters: never;
@@ -1731,6 +1867,9 @@ export interface paths {
   "/api/v1/recipes/{recipe_id}/promote": {
     post: operations["promote_api_v1_recipes__recipe_id__promote_post"];
   };
+  "/api/v1/recipes/{recipe_id}/run": {
+    post: operations["run_api_v1_recipes__recipe_id__run_post"];
+  };
   "/api/v1/recipes/{recipe_id}/verify": {
     post: operations["verify_api_v1_recipes__recipe_id__verify_post"];
   };
@@ -1745,6 +1884,15 @@ export interface paths {
   };
   "/api/v1/releases/{notice_id}/decision": {
     post: operations["decide_api_v1_releases__notice_id__decision_post"];
+  };
+  "/api/v1/serving/{worker_id}": {
+    get: operations["status_api_v1_serving__worker_id__get"];
+  };
+  "/api/v1/serving/{worker_id}/chat": {
+    post: operations["chat_api_v1_serving__worker_id__chat_post"];
+  };
+  "/api/v1/serving/{worker_id}/{session_id}/stop": {
+    post: operations["stop_api_v1_serving__worker_id___session_id__stop_post"];
   };
   "/api/v1/status": {
     get: operations["status_api_v1_status_get"];
@@ -1779,6 +1927,9 @@ export interface paths {
   "/api/v1/workers/{worker_id}/snapshot": {
     get: operations["get_worker_snapshot_api_v1_workers__worker_id__snapshot_get"];
     post: operations["upload_snapshot_api_v1_workers__worker_id__snapshot_post"];
+  };
+  "/api/v1/workers/{worker_id}/verify-models": {
+    post: operations["verify_models_api_v1_workers__worker_id__verify_models_post"];
   };
   "/health": {
     get: operations["health_health_get"];

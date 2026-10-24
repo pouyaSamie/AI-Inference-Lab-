@@ -873,7 +873,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "A concrete, reproducible parameter vector for one trial and context.\n\n``candidate_id`` is deterministic over engine hash, model digest, worker,\ncontext, workload digest and parameters, which makes duplicate proposals\ndetectable across controller and optimizer restarts.",
+      "description": "A concrete, reproducible parameter vector for one trial and context.\n\n``candidate_id`` is deterministic over the study, engine hash, model digest,\nworker, context, workload digest and parameters. Scoping the identity to a\nstudy keeps repeated experiments with the same baseline from colliding in\nthe controller's global candidate table, while ``semantic_key`` still\nsupports duplicate detection inside one study.",
       "properties": {
         "candidate_id": {
           "$ref": "#/$defs/Identifier",
@@ -2724,6 +2724,50 @@
           "title": "RawEvidenceRef",
           "type": "object"
         },
+        "RecipeChatResult": {
+          "additionalProperties": false,
+          "properties": {
+            "command_type": {
+              "const": "RECIPE_CHAT",
+              "default": "RECIPE_CHAT",
+              "title": "Command Type",
+              "type": "string"
+            },
+            "content": {
+              "maxLength": 32768,
+              "title": "Content",
+              "type": "string"
+            },
+            "session_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "session_id",
+            "content"
+          ],
+          "title": "RecipeChatResult",
+          "type": "object"
+        },
+        "RunRecipeResult": {
+          "additionalProperties": false,
+          "properties": {
+            "command_type": {
+              "const": "RUN_RECIPE",
+              "default": "RUN_RECIPE",
+              "title": "Command Type",
+              "type": "string"
+            },
+            "session": {
+              "$ref": "#/$defs/ServingSession"
+            }
+          },
+          "required": [
+            "session"
+          ],
+          "title": "RunRecipeResult",
+          "type": "object"
+        },
         "ScanResult": {
           "additionalProperties": false,
           "properties": {
@@ -2751,11 +2795,117 @@
           "title": "ScanResult",
           "type": "object"
         },
+        "ServingSession": {
+          "additionalProperties": false,
+          "properties": {
+            "bytes_done": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Bytes Done",
+              "type": "integer"
+            },
+            "bytes_total": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Bytes Total",
+              "type": "integer"
+            },
+            "context_tokens": {
+              "exclusiveMinimum": 0,
+              "title": "Context Tokens",
+              "type": "integer"
+            },
+            "files_done": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Files Done",
+              "type": "integer"
+            },
+            "files_total": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Files Total",
+              "type": "integer"
+            },
+            "message": {
+              "default": "",
+              "maxLength": 400,
+              "title": "Message",
+              "type": "string"
+            },
+            "port": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1024,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Port"
+            },
+            "recipe_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "session_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "started_at": {
+              "$ref": "#/$defs/AwareTimestamp"
+            },
+            "state": {
+              "enum": [
+                "starting",
+                "ready",
+                "stopped",
+                "failed"
+              ],
+              "title": "State",
+              "type": "string"
+            }
+          },
+          "required": [
+            "session_id",
+            "recipe_id",
+            "state",
+            "context_tokens",
+            "started_at"
+          ],
+          "title": "ServingSession",
+          "type": "object"
+        },
         "Sha256": {
           "maxLength": 64,
           "minLength": 64,
           "pattern": "^[0-9a-f]{64}$",
           "type": "string"
+        },
+        "StopRecipeResult": {
+          "additionalProperties": false,
+          "properties": {
+            "command_type": {
+              "const": "STOP_RECIPE",
+              "default": "STOP_RECIPE",
+              "title": "Command Type",
+              "type": "string"
+            },
+            "session_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "stopped": {
+              "title": "Stopped",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "session_id",
+            "stopped"
+          ],
+          "title": "StopRecipeResult",
+          "type": "object"
         },
         "SupportLevel": {
           "enum": [
@@ -2928,6 +3078,17 @@
               "title": "Owned Pids",
               "type": "array"
             },
+            "serving": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ServingSession"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
             "status": {
               "default": "online",
               "title": "Status",
@@ -3053,7 +3214,10 @@
                   "PAUSE": "#/$defs/PauseResult",
                   "PREFLIGHT": "#/$defs/PreflightResult",
                   "PROMOTE": "#/$defs/PromoteResult",
+                  "RECIPE_CHAT": "#/$defs/RecipeChatResult",
+                  "RUN_RECIPE": "#/$defs/RunRecipeResult",
                   "SCAN": "#/$defs/ScanResult",
+                  "STOP_RECIPE": "#/$defs/StopRecipeResult",
                   "VERIFY_RECIPE": "#/$defs/VerifyRecipeResult"
                 },
                 "propertyName": "command_type"
@@ -3079,6 +3243,15 @@
                 },
                 {
                   "$ref": "#/$defs/PromoteResult"
+                },
+                {
+                  "$ref": "#/$defs/RunRecipeResult"
+                },
+                {
+                  "$ref": "#/$defs/StopRecipeResult"
+                },
+                {
+                  "$ref": "#/$defs/RecipeChatResult"
                 }
               ]
             },
@@ -9451,6 +9624,133 @@
           "title": "CancelPayload",
           "type": "object"
         },
+        "CandidateRole": {
+          "enum": [
+            "baseline",
+            "candidate"
+          ],
+          "title": "CandidateRole",
+          "type": "string"
+        },
+        "CandidateSpec": {
+          "additionalProperties": false,
+          "description": "A concrete, reproducible parameter vector for one trial and context.\n\n``candidate_id`` is deterministic over the study, engine hash, model digest,\nworker, context, workload digest and parameters. Scoping the identity to a\nstudy keeps repeated experiments with the same baseline from colliding in\nthe controller's global candidate table, while ``semantic_key`` still\nsupports duplicate detection inside one study.",
+          "properties": {
+            "candidate_id": {
+              "$ref": "#/$defs/Identifier",
+              "default": ""
+            },
+            "context": {
+              "$ref": "#/$defs/ContextLength"
+            },
+            "engine_id": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "engine_sha256": {
+              "$ref": "#/$defs/Sha256"
+            },
+            "experiment_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "model_digest": {
+              "$ref": "#/$defs/Sha256"
+            },
+            "notes": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Notes",
+              "type": "array"
+            },
+            "parameter_digest": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "parameters": {
+              "$ref": "#/$defs/Parameters"
+            },
+            "role": {
+              "$ref": "#/$defs/CandidateRole",
+              "default": "candidate"
+            },
+            "schema_version": {
+              "$ref": "#/$defs/NonEmptyStr",
+              "default": "1.0.0"
+            },
+            "state": {
+              "$ref": "#/$defs/CandidateState",
+              "default": "proposed"
+            },
+            "study_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "trial_number": {
+              "$ref": "#/$defs/NonNegativeInt"
+            },
+            "worker_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "workload_digest": {
+              "$ref": "#/$defs/Sha256"
+            }
+          },
+          "required": [
+            "study_id",
+            "experiment_id",
+            "trial_number",
+            "engine_id",
+            "engine_sha256",
+            "model_digest",
+            "worker_id",
+            "context",
+            "workload_digest"
+          ],
+          "title": "CandidateSpec",
+          "type": "object"
+        },
+        "CandidateState": {
+          "enum": [
+            "proposed",
+            "claimed",
+            "observed",
+            "infeasible",
+            "failed",
+            "finalized",
+            "discarded"
+          ],
+          "title": "CandidateState",
+          "type": "string"
+        },
+        "ChatMessage": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "role": {
+              "enum": [
+                "user",
+                "assistant"
+              ],
+              "title": "Role",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "content"
+          ],
+          "title": "ChatMessage",
+          "type": "object"
+        },
         "ClaimTrialPayload": {
           "additionalProperties": false,
           "properties": {
@@ -9544,6 +9844,9 @@
         },
         "CommandType": {
           "enum": [
+            "RUN_RECIPE",
+            "STOP_RECIPE",
+            "RECIPE_CHAT",
             "SCAN",
             "PREFLIGHT",
             "CLAIM_TRIAL",
@@ -10009,6 +10312,95 @@
           "title": "PromotePayload",
           "type": "object"
         },
+        "RecipeChatPayload": {
+          "additionalProperties": false,
+          "properties": {
+            "command_type": {
+              "const": "RECIPE_CHAT",
+              "default": "RECIPE_CHAT",
+              "title": "Command Type",
+              "type": "string"
+            },
+            "max_tokens": {
+              "default": 128,
+              "maximum": 512,
+              "minimum": 1,
+              "title": "Max Tokens",
+              "type": "integer"
+            },
+            "messages": {
+              "items": {
+                "$ref": "#/$defs/ChatMessage"
+              },
+              "maxItems": 16,
+              "minItems": 1,
+              "title": "Messages",
+              "type": "array"
+            },
+            "session_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "session_id",
+            "messages"
+          ],
+          "title": "RecipeChatPayload",
+          "type": "object"
+        },
+        "RunRecipePayload": {
+          "additionalProperties": false,
+          "properties": {
+            "candidate": {
+              "$ref": "#/$defs/CandidateSpec"
+            },
+            "command_type": {
+              "const": "RUN_RECIPE",
+              "default": "RUN_RECIPE",
+              "title": "Command Type",
+              "type": "string"
+            },
+            "gpu_uuid": {
+              "$ref": "#/$defs/NonEmptyStr"
+            },
+            "issued_at": {
+              "$ref": "#/$defs/AwareTimestamp"
+            },
+            "model": {
+              "$ref": "#/$defs/ModelArtifact"
+            },
+            "profile_sha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Sha256"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "recipe_digest": {
+              "$ref": "#/$defs/Sha256"
+            },
+            "recipe_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "session_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "session_id",
+            "recipe_id",
+            "recipe_digest",
+            "candidate",
+            "model",
+            "gpu_uuid"
+          ],
+          "title": "RunRecipePayload",
+          "type": "object"
+        },
         "ScanPayload": {
           "additionalProperties": false,
           "properties": {
@@ -10037,6 +10429,17 @@
               "default": true,
               "title": "Include Models",
               "type": "boolean"
+            },
+            "model_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             },
             "reason": {
               "anyOf": [
@@ -10069,6 +10472,25 @@
           "minLength": 64,
           "pattern": "^[0-9a-f]{64}$",
           "type": "string"
+        },
+        "StopRecipePayload": {
+          "additionalProperties": false,
+          "properties": {
+            "command_type": {
+              "const": "STOP_RECIPE",
+              "default": "STOP_RECIPE",
+              "title": "Command Type",
+              "type": "string"
+            },
+            "session_id": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "session_id"
+          ],
+          "title": "StopRecipePayload",
+          "type": "object"
         },
         "UnitFraction": {
           "exclusiveMinimum": 0.0,
@@ -10204,7 +10626,10 @@
               "PAUSE": "#/$defs/PausePayload",
               "PREFLIGHT": "#/$defs/PreflightPayload",
               "PROMOTE": "#/$defs/PromotePayload",
+              "RECIPE_CHAT": "#/$defs/RecipeChatPayload",
+              "RUN_RECIPE": "#/$defs/RunRecipePayload",
               "SCAN": "#/$defs/ScanPayload",
+              "STOP_RECIPE": "#/$defs/StopRecipePayload",
               "VERIFY_RECIPE": "#/$defs/VerifyRecipePayload"
             },
             "propertyName": "command_type"
@@ -10230,6 +10655,15 @@
             },
             {
               "$ref": "#/$defs/PromotePayload"
+            },
+            {
+              "$ref": "#/$defs/RunRecipePayload"
+            },
+            {
+              "$ref": "#/$defs/StopRecipePayload"
+            },
+            {
+              "$ref": "#/$defs/RecipeChatPayload"
             }
           ],
           "title": "Payload"
@@ -11189,6 +11623,88 @@
           "exclusiveMinimum": 0,
           "type": "integer"
         },
+        "ServingSession": {
+          "additionalProperties": false,
+          "properties": {
+            "bytes_done": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Bytes Done",
+              "type": "integer"
+            },
+            "bytes_total": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Bytes Total",
+              "type": "integer"
+            },
+            "context_tokens": {
+              "exclusiveMinimum": 0,
+              "title": "Context Tokens",
+              "type": "integer"
+            },
+            "files_done": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Files Done",
+              "type": "integer"
+            },
+            "files_total": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Files Total",
+              "type": "integer"
+            },
+            "message": {
+              "default": "",
+              "maxLength": 400,
+              "title": "Message",
+              "type": "string"
+            },
+            "port": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 1024,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Port"
+            },
+            "recipe_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "session_id": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "started_at": {
+              "$ref": "#/$defs/AwareTimestamp"
+            },
+            "state": {
+              "enum": [
+                "starting",
+                "ready",
+                "stopped",
+                "failed"
+              ],
+              "title": "State",
+              "type": "string"
+            }
+          },
+          "required": [
+            "session_id",
+            "recipe_id",
+            "state",
+            "context_tokens",
+            "started_at"
+          ],
+          "title": "ServingSession",
+          "type": "object"
+        },
         "Sha256": {
           "maxLength": 64,
           "minLength": 64,
@@ -11231,6 +11747,17 @@
               },
               "title": "Owned Pids",
               "type": "array"
+            },
+            "serving": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ServingSession"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             },
             "status": {
               "default": "online",

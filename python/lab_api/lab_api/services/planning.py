@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from lab_core.errors import NotFoundError
 from lab_core.ids import new_id
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from lab_adapters import registry as adapter_registry
@@ -36,7 +37,31 @@ from .commands import enqueue_command
 from .inventory import latest_snapshot, snapshot_freshness, snapshot_model
 
 
-def _queue_scan(session: Session, settings: Settings, worker_id: str, reason: str) -> WorkerCommandRow:
+def _queue_scan(
+    session: Session,
+    settings: Settings,
+    worker_id: str,
+    reason: str,
+    model_id: str | None = None,
+    verify: bool = False,
+) -> WorkerCommandRow:
+    verify = verify or model_id is not None
+    worker = session.get(WorkerRow, worker_id)
+    if model_id and worker and "targeted-model-verification" not in worker.roles:
+        model_id = None  # Older workers keep the original whole-library SCAN protocol.
+    active = session.scalars(
+        select(WorkerCommandRow).where(
+            WorkerCommandRow.worker_id == worker_id,
+            WorkerCommandRow.command_type == CommandType.SCAN.value,
+            WorkerCommandRow.status.in_(["pending", "leased", "acknowledged", "running"]),
+        )
+    ).all()
+    for command in active:
+        if (model_id is None and not verify) or (
+            command.payload_json.get("hash_models")
+            and command.payload_json.get("model_id") in (None, model_id)
+        ):
+            return command
     return enqueue_command(
         session,
         settings,
@@ -46,8 +71,9 @@ def _queue_scan(session: Session, settings: Settings, worker_id: str, reason: st
             roots=tuple(settings.allowed_model_roots),
             include_engines=True,
             include_models=True,
-            include_hardware=True,
-            hash_models=settings.scan_hash_models,
+            include_hardware=not (model_id or verify),
+            hash_models=True if model_id or verify else settings.scan_hash_models,
+            model_id=model_id,
             reason=reason,
         ),
         idempotency_key=f"scan:{worker_id}:{new_id('req')}",
@@ -142,6 +168,24 @@ def build_plan(session: Session, settings: Settings, request: PlanRequest) -> Pl
             status=PlanStatus.PREFLIGHT_REQUIRED,
             command_id=command.command_id,
             reason=f"Model {request.model_id!r} is not present in the worker inventory.",
+            retry_after_ms=2000,
+        )
+
+    if settings.execution_mode == "real" and not model.hashes_complete():
+        command = _queue_scan(
+            session,
+            settings,
+            worker.worker_id,
+            reason="Verify model file identities before planning",
+            model_id=model.model_id,
+        )
+        return PlanResponse(
+            status=PlanStatus.PREFLIGHT_REQUIRED,
+            command_id=command.command_id,
+            reason=(
+                "Checking the selected model files. Large models can take several minutes. "
+                "The plan will continue automatically."
+            ),
             retry_after_ms=2000,
         )
 

@@ -33,6 +33,8 @@ def transition_experiment(
         experiment.started_at = utcnow()
     if target in (JobState.COMPLETED, JobState.CANCELLED, JobState.FAILED, JobState.BLOCKED):
         experiment.completed_at = utcnow()
+    else:
+        experiment.completed_at = None
     append_event(
         session,
         experiment.experiment_id,

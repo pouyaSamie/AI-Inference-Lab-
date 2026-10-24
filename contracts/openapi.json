@@ -649,7 +649,7 @@
       },
       "CandidateSpec": {
         "additionalProperties": false,
-        "description": "A concrete, reproducible parameter vector for one trial and context.\n\n``candidate_id`` is deterministic over engine hash, model digest, worker,\ncontext, workload digest and parameters, which makes duplicate proposals\ndetectable across controller and optimizer restarts.",
+        "description": "A concrete, reproducible parameter vector for one trial and context.\n\n``candidate_id`` is deterministic over the study, engine hash, model digest,\nworker, context, workload digest and parameters. Scoping the identity to a\nstudy keeps repeated experiments with the same baseline from colliding in\nthe controller's global candidate table, while ``semantic_key`` still\nsupports duplicate detection inside one study.",
         "properties": {
           "candidate_id": {
             "$ref": "#/components/schemas/Identifier",
@@ -921,6 +921,28 @@
         "title": "ChangedArea",
         "type": "string"
       },
+      "ChatMessage": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatMessage",
+        "type": "object"
+      },
       "ClaimTrialPayload": {
         "additionalProperties": false,
         "properties": {
@@ -1084,7 +1106,10 @@
                     "PAUSE": "#/components/schemas/PauseResult",
                     "PREFLIGHT": "#/components/schemas/PreflightResult",
                     "PROMOTE": "#/components/schemas/PromoteResult",
+                    "RECIPE_CHAT": "#/components/schemas/RecipeChatResult",
+                    "RUN_RECIPE": "#/components/schemas/RunRecipeResult",
                     "SCAN": "#/components/schemas/ScanResult",
+                    "STOP_RECIPE": "#/components/schemas/StopRecipeResult",
                     "VERIFY_RECIPE": "#/components/schemas/VerifyRecipeResult"
                   },
                   "propertyName": "command_type"
@@ -1110,6 +1135,15 @@
                   },
                   {
                     "$ref": "#/components/schemas/PromoteResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RunRecipeResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StopRecipeResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RecipeChatResult"
                   }
                 ]
               },
@@ -1176,8 +1210,145 @@
         "title": "CommandStatus",
         "type": "string"
       },
+      "CommandStatusView": {
+        "additionalProperties": false,
+        "properties": {
+          "ack_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AwareTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attempts": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "command_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "command_type": {
+            "$ref": "#/components/schemas/CommandType"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AwareTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "experiment_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lease_generation": {
+            "$ref": "#/components/schemas/NonNegativeInt"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "CANCEL": "#/components/schemas/CancelResult",
+                    "CLAIM_TRIAL": "#/components/schemas/TrialResult",
+                    "PAUSE": "#/components/schemas/PauseResult",
+                    "PREFLIGHT": "#/components/schemas/PreflightResult",
+                    "PROMOTE": "#/components/schemas/PromoteResult",
+                    "RECIPE_CHAT": "#/components/schemas/RecipeChatResult",
+                    "RUN_RECIPE": "#/components/schemas/RunRecipeResult",
+                    "SCAN": "#/components/schemas/ScanResult",
+                    "STOP_RECIPE": "#/components/schemas/StopRecipeResult",
+                    "VERIFY_RECIPE": "#/components/schemas/VerifyRecipeResult"
+                  },
+                  "propertyName": "command_type"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ScanResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PreflightResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TrialResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PauseResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CancelResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VerifyRecipeResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PromoteResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RunRecipeResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StopRecipeResult"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RecipeChatResult"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommandStatus"
+          },
+          "worker_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "command_id",
+          "worker_id",
+          "command_type",
+          "status",
+          "attempts",
+          "lease_generation",
+          "created_at"
+        ],
+        "title": "CommandStatusView",
+        "type": "object"
+      },
       "CommandType": {
         "enum": [
+          "RUN_RECIPE",
+          "STOP_RECIPE",
+          "RECIPE_CHAT",
           "SCAN",
           "PREFLIGHT",
           "CLAIM_TRIAL",
@@ -4808,6 +4979,97 @@
         "title": "RawEvidenceRef",
         "type": "object"
       },
+      "RecipeChatPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "RECIPE_CHAT",
+            "default": "RECIPE_CHAT",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "max_tokens": {
+            "default": 128,
+            "maximum": 512.0,
+            "minimum": 1.0,
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Messages",
+            "type": "array"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "session_id",
+          "messages"
+        ],
+        "title": "RecipeChatPayload",
+        "type": "object"
+      },
+      "RecipeChatRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "max_tokens": {
+            "default": 128,
+            "maximum": 512.0,
+            "minimum": 1.0,
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Messages",
+            "type": "array"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "session_id",
+          "messages"
+        ],
+        "title": "RecipeChatRequest",
+        "type": "object"
+      },
+      "RecipeChatResult": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "RECIPE_CHAT",
+            "default": "RECIPE_CHAT",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "content": {
+            "maxLength": 32768,
+            "title": "Content",
+            "type": "string"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "session_id",
+          "content"
+        ],
+        "title": "RecipeChatResult",
+        "type": "object"
+      },
       "RecipeCreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5440,6 +5702,77 @@
         "title": "ResourceConstraints",
         "type": "object"
       },
+      "RunRecipePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate": {
+            "$ref": "#/components/schemas/CandidateSpec"
+          },
+          "command_type": {
+            "const": "RUN_RECIPE",
+            "default": "RUN_RECIPE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "gpu_uuid": {
+            "$ref": "#/components/schemas/NonEmptyStr"
+          },
+          "issued_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelArtifact"
+          },
+          "profile_sha256": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recipe_digest": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "recipe_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "session_id",
+          "recipe_id",
+          "recipe_digest",
+          "candidate",
+          "model",
+          "gpu_uuid"
+        ],
+        "title": "RunRecipePayload",
+        "type": "object"
+      },
+      "RunRecipeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "RUN_RECIPE",
+            "default": "RUN_RECIPE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "session": {
+            "$ref": "#/components/schemas/ServingSession"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "title": "RunRecipeResult",
+        "type": "object"
+      },
       "ScanPayload": {
         "additionalProperties": false,
         "properties": {
@@ -5468,6 +5801,16 @@
             "default": true,
             "title": "Include Models",
             "type": "boolean"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Identifier"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "reason": {
             "anyOf": [
@@ -5710,11 +6053,135 @@
         "title": "SearchSpaceSpec",
         "type": "object"
       },
+      "ServingSession": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes_done": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Bytes Done",
+            "type": "integer"
+          },
+          "bytes_total": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Bytes Total",
+            "type": "integer"
+          },
+          "context_tokens": {
+            "exclusiveMinimum": 0.0,
+            "title": "Context Tokens",
+            "type": "integer"
+          },
+          "files_done": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Files Done",
+            "type": "integer"
+          },
+          "files_total": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Files Total",
+            "type": "integer"
+          },
+          "message": {
+            "default": "",
+            "maxLength": 400,
+            "title": "Message",
+            "type": "string"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 1024.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "recipe_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "started_at": {
+            "$ref": "#/components/schemas/AwareTimestamp"
+          },
+          "state": {
+            "enum": [
+              "starting",
+              "ready",
+              "stopped",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "recipe_id",
+          "state",
+          "context_tokens",
+          "started_at"
+        ],
+        "title": "ServingSession",
+        "type": "object"
+      },
       "Sha256": {
         "maxLength": 64,
         "minLength": 64,
         "pattern": "^[0-9a-f]{64}$",
         "type": "string"
+      },
+      "StopRecipePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "STOP_RECIPE",
+            "default": "STOP_RECIPE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/Identifier"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "StopRecipePayload",
+        "type": "object"
+      },
+      "StopRecipeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "command_type": {
+            "const": "STOP_RECIPE",
+            "default": "STOP_RECIPE",
+            "title": "Command Type",
+            "type": "string"
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "stopped": {
+            "title": "Stopped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "session_id",
+          "stopped"
+        ],
+        "title": "StopRecipeResult",
+        "type": "object"
       },
       "StudyCreatedResult": {
         "additionalProperties": false,
@@ -5790,6 +6257,10 @@
           "service": {
             "title": "Service",
             "type": "string"
+          },
+          "serving_active": {
+            "$ref": "#/components/schemas/NonNegativeInt",
+            "default": 0
           },
           "version": {
             "title": "Version",
@@ -6174,7 +6645,10 @@
                 "PAUSE": "#/components/schemas/PausePayload",
                 "PREFLIGHT": "#/components/schemas/PreflightPayload",
                 "PROMOTE": "#/components/schemas/PromotePayload",
+                "RECIPE_CHAT": "#/components/schemas/RecipeChatPayload",
+                "RUN_RECIPE": "#/components/schemas/RunRecipePayload",
                 "SCAN": "#/components/schemas/ScanPayload",
+                "STOP_RECIPE": "#/components/schemas/StopRecipePayload",
                 "VERIFY_RECIPE": "#/components/schemas/VerifyRecipePayload"
               },
               "propertyName": "command_type"
@@ -6200,6 +6674,15 @@
               },
               {
                 "$ref": "#/components/schemas/PromotePayload"
+              },
+              {
+                "$ref": "#/components/schemas/RunRecipePayload"
+              },
+              {
+                "$ref": "#/components/schemas/StopRecipePayload"
+              },
+              {
+                "$ref": "#/components/schemas/RecipeChatPayload"
               }
             ],
             "title": "Payload"
@@ -6289,6 +6772,16 @@
             },
             "title": "Owned Pids",
             "type": "array"
+          },
+          "serving": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServingSession"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "default": "online",
@@ -8254,6 +8747,80 @@
         ]
       }
     },
+    "/api/v1/recipes/{recipe_id}/run": {
+      "post": {
+        "operationId": "run_api_v1_recipes__recipe_id__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recipe_id",
+            "required": true,
+            "schema": {
+              "title": "Recipe Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run",
+        "tags": [
+          "serving"
+        ]
+      }
+    },
     "/api/v1/recipes/{recipe_id}/verify": {
       "post": {
         "operationId": "verify_api_v1_recipes__recipe_id__verify_post",
@@ -8548,6 +9115,223 @@
         ]
       }
     },
+    "/api/v1/serving/{worker_id}": {
+      "get": {
+        "operationId": "status_api_v1_serving__worker_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ServingSession"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Status Api V1 Serving  Worker Id  Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Status",
+        "tags": [
+          "serving"
+        ]
+      }
+    },
+    "/api/v1/serving/{worker_id}/chat": {
+      "post": {
+        "operationId": "chat_api_v1_serving__worker_id__chat_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecipeChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat",
+        "tags": [
+          "serving"
+        ]
+      }
+    },
+    "/api/v1/serving/{worker_id}/{session_id}/stop": {
+      "post": {
+        "operationId": "stop_api_v1_serving__worker_id___session_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop",
+        "tags": [
+          "serving"
+        ]
+      }
+    },
     "/api/v1/status": {
       "get": {
         "operationId": "status_api_v1_status_get",
@@ -8799,8 +9583,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/CommandStatusView"
                   },
                   "title": "Response List Worker Commands Api V1 Workers  Worker Id  Commands Get",
                   "type": "array"
@@ -9313,6 +10096,80 @@
           }
         },
         "summary": "Upload Snapshot",
+        "tags": [
+          "workers"
+        ]
+      }
+    },
+    "/api/v1/workers/{worker_id}/verify-models": {
+      "post": {
+        "operationId": "verify_models_api_v1_workers__worker_id__verify_models_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Models",
         "tags": [
           "workers"
         ]

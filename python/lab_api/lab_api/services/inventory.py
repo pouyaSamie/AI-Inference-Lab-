@@ -178,6 +178,7 @@ def heartbeat(
         raise ConflictError("worker is disabled", details={"worker_id": worker_id})
     if snapshot_revision is not None and snapshot_revision > worker.snapshot_revision:
         raise ValidationFailure("heartbeat cannot advance the snapshot revision; upload a snapshot instead")
+    worker.serving_json = health.serving.model_dump(mode="json") if health.serving else {}
     worker.last_heartbeat_at = utcnow()
     worker.status = "online"
     worker.updated_at = utcnow()

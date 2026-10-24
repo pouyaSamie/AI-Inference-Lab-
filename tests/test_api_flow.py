@@ -145,6 +145,45 @@ def test_plan_create_optimize_and_reject_simulated_recipe(
         assert gap_events[0] == "event.gap"
         assert gap_events[1] == "snapshot"
 
+        # A new key means a new run, even when the immutable plan is identical.
+        # Keep completed/cancelled studies intact and keep same-key replays stable.
+        from lab_api.orm import StudyRow
+
+        experiment_ids = [experiment_id]
+        for key in ("repeat-completed-plan", "repeat-cancelled-plan"):
+            repeated = client.post(
+                "/api/v1/experiments",
+                headers={"Idempotency-Key": key},
+                json={"plan": plan},
+            )
+            assert repeated.status_code == 201, repeated.text
+            repeated_id = repeated.json()["status"]["experiment_id"]
+            assert repeated_id not in experiment_ids
+            experiment_ids.append(repeated_id)
+            replayed = client.post(
+                "/api/v1/experiments",
+                headers={"Idempotency-Key": key},
+                json={"plan": plan},
+            )
+            assert replayed.status_code == 200, replayed.text
+            assert replayed.headers["Idempotent-Replayed"] == "true"
+            assert replayed.json()["status"]["experiment_id"] == repeated_id
+            cancelled = client.post(f"/api/v1/experiments/{repeated_id}/cancel")
+            assert cancelled.status_code == 200, cancelled.text
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline:
+                state = client.get(f"/api/v1/experiments/{repeated_id}").json()["status"]["state"]
+                if state in TERMINAL:
+                    break
+                time.sleep(0.05)
+            assert state == "cancelled"
+        with controller.session_factory() as session:
+            studies = session.query(StudyRow).filter(StudyRow.experiment_id.in_(experiment_ids)).all()
+            assert len(studies) == 3
+            assert len({study.study_id for study in studies}) == 3
+            assert len({study.study_name for study in studies}) == 3
+        assert client.get(f"/api/v1/experiments/{experiment_id}").json()["status"]["state"] == "completed"
+
 
 def test_qualified_measured_evidence_builds_a_validated_recipe(
     controller: ControllerHandle,
@@ -281,6 +320,96 @@ def test_qualified_measured_evidence_builds_a_validated_recipe(
         assert recipe["status"] == "validated"
         assert recipe["recipe"]["validation"]["confidence_ref"]
 
+        # Each HTTP request opens a fresh SQLite session, which reloads naive
+        # datetimes even though the contract requires timezone-aware timestamps.
+        from datetime import datetime
+
+        recipe_id = recipe["recipe_id"]
+        for response in (
+            client.get(f"/api/v1/recipes/{recipe_id}"),
+            client.post(
+                "/api/v1/recipes",
+                headers={"Idempotency-Key": "recipe-qualified-1"},
+                json={"experiment_id": experiment_id, "candidate_id": candidate_id},
+            ),
+        ):
+            assert response.status_code in {200, 201}, response.text
+            assert response.json() == recipe
+            assert datetime.fromisoformat(response.json()["created_at"]).tzinfo is not None
+        for params in ({}, {"experiment_id": experiment_id}):
+            listed = client.get("/api/v1/recipes", params=params)
+            assert listed.status_code == 200, listed.text
+            assert listed.json() == {"recipes": [recipe], "total": 1}
+
+        # Queue-only serving contract checks using the same synthetic measured
+        # rows. Stop the simulator first: these commands must never launch a real
+        # engine or be represented as live serving acceptance.
+        simulated_worker.stop.set()
+        simulated_worker.thread.join(timeout=5)
+        from lab_api.orm import WorkerCommandRow, WorkerRow
+
+        from lab_core import ServingSession, utcnow
+
+        old_mode = controller.settings.execution_mode
+        controller.settings.execution_mode = "real"
+        try:
+            with controller.session_factory() as session:
+                worker = session.get(WorkerRow, "sim-test")
+                worker.roles = [*worker.roles, "recipe-serving"]
+                session.commit()
+            started = client.post(
+                f"/api/v1/recipes/{recipe_id}/run", headers={"Idempotency-Key": "serve-qualified"}
+            )
+            assert started.status_code == 200, started.text
+            command_id = started.json()["command_id"]
+            with controller.session_factory() as session:
+                command = session.get(WorkerCommandRow, command_id)
+                serving_id = command.payload_json["session_id"]
+                worker = session.get(WorkerRow, "sim-test")
+                worker.serving_json = ServingSession(
+                    session_id=serving_id,
+                    recipe_id=recipe_id,
+                    state="ready",
+                    context_tokens=4096,
+                    port=18765,
+                    started_at=utcnow(),
+                ).model_dump(mode="json")
+                session.commit()
+            replay = client.post(
+                f"/api/v1/recipes/{recipe_id}/run", headers={"Idempotency-Key": "serve-qualified"}
+            )
+            assert replay.status_code == 200 and replay.json()["command_id"] == command_id
+            duplicate = client.post(
+                f"/api/v1/recipes/{recipe_id}/run", headers={"Idempotency-Key": "serve-other"}
+            )
+            assert duplicate.status_code == 409
+            state = client.get("/api/v1/serving/sim-test")
+            assert state.status_code == 200 and state.json()["session_id"] == serving_id
+            benchmark = client.post(
+                "/api/v1/experiments", headers={"Idempotency-Key": "while-serving"}, json={"plan": plan}
+            )
+            assert benchmark.status_code == 409
+            body = {"session_id": serving_id, "messages": [{"role": "user", "content": "fixture"}]}
+            chat = client.post(
+                "/api/v1/serving/sim-test/chat", json=body, headers={"Idempotency-Key": "chat-once"}
+            )
+            assert chat.status_code == 200, chat.text
+            again = client.post(
+                "/api/v1/serving/sim-test/chat", json=body, headers={"Idempotency-Key": "chat-once"}
+            )
+            assert again.status_code == 200 and again.json()["command_id"] == chat.json()["command_id"]
+            changed = client.post(
+                "/api/v1/serving/sim-test/chat",
+                json={**body, "max_tokens": 32},
+                headers={"Idempotency-Key": "chat-once"},
+            )
+            assert changed.status_code == 409
+            stopped = client.post(f"/api/v1/serving/sim-test/{serving_id}/stop")
+            assert stopped.status_code == 200
+            assert stopped.json()["command_type"] == "STOP_RECIPE"
+        finally:
+            controller.settings.execution_mode = old_mode
+
 
 def test_plan_requires_preflight_for_missing_inventory(controller: ControllerHandle) -> None:
     from lab_worker.client import WorkerClient
@@ -362,3 +491,47 @@ def test_execution_mode_accepts_real_mode_startup(settings) -> None:
     real = settings.model_copy(update={"execution_mode": "real"})
     app = create_app(real)
     assert app.state.settings.execution_mode == "real"
+
+
+def test_real_planning_queues_hash_verification_for_discovered_models(
+    controller: ControllerHandle, simulated_worker, monkeypatch
+) -> None:
+    from lab_api.orm import WorkerCommandRow
+    from lab_api.schemas import PlanRequest
+    from lab_api.services import planning
+    from lab_api.services.inventory import latest_snapshot, snapshot_model
+
+    with controller.session_factory() as session:
+        row = latest_snapshot(session, "sim-test")
+        assert row is not None
+        snapshot = snapshot_model(row)
+        models = tuple(
+            model.model_copy(
+                update={
+                    "files": tuple(
+                        file.model_copy(update={"sha256": None, "verified": False}) for file in model.files
+                    )
+                }
+            )
+            for model in snapshot.models
+        )
+        monkeypatch.setattr(
+            planning, "snapshot_model", lambda _: snapshot.model_copy(update={"models": models})
+        )
+        response = planning.build_plan(
+            session,
+            controller.settings.model_copy(update={"execution_mode": "real"}),
+            PlanRequest.model_validate(plan_body()),
+        )
+        assert response.status.value == "preflight_required"
+        assert response.plan is None
+        assert "selected model files" in response.reason
+        repeated = planning.build_plan(
+            session,
+            controller.settings.model_copy(update={"execution_mode": "real"}),
+            PlanRequest.model_validate(plan_body()),
+        )
+        assert repeated.command_id == response.command_id
+        command = session.get(WorkerCommandRow, response.command_id)
+        assert command is not None
+        assert command.payload_json["hash_models"] is True

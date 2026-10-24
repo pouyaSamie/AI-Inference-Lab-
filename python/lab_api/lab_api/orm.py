@@ -59,6 +59,7 @@ class WorkerRow(Base):
     token_prefix: Mapped[str] = mapped_column(String(16))
     token_sha256: Mapped[str] = mapped_column(String(64))
     disabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    serving_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

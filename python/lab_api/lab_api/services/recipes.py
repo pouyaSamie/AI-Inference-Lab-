@@ -25,7 +25,7 @@ from lab_core import (
 )
 
 from ..config import Settings
-from ..orm import CandidateRow, ExperimentRow, ObservationRow, RecipeRow
+from ..orm import CandidateRow, ExperimentRow, ObservationRow, RecipeRow, as_utc
 from ..schemas import RecipeView
 from .inventory import latest_snapshot, snapshot_model
 
@@ -220,7 +220,7 @@ def _recipe_view(row: RecipeRow) -> RecipeView:
         status=row.status,
         recipe_digest=row.digest,
         recipe=row.manifest_json,
-        created_at=row.created_at,
+        created_at=as_utc(row.created_at),
     )
 
 

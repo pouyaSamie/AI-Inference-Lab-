@@ -12,7 +12,7 @@ from lab_core import TERMINAL_JOB_STATES
 
 from ..config import Settings
 from ..dependencies import get_session, get_settings
-from ..orm import ExperimentRow
+from ..orm import ExperimentRow, WorkerRow
 from ..schemas import HealthResponse, SystemStatusResponse
 from ..security import Principal, require_operator
 from ..services.inventory import active_worker_count
@@ -82,6 +82,11 @@ def status(
         optimizer=health,
         workers_online=active_worker_count(session),
         experiments_active=int(active),
+        serving_active=sum(
+            1
+            for worker in session.scalars(select(WorkerRow))
+            if not worker.disabled and worker.serving_json.get("state") in {"starting", "ready"}
+        ),
         scheduler_running=bool(runtime.running),
         allow_simulation=settings.allow_simulation,
         warnings=tuple(warnings),
